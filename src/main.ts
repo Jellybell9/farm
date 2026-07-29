@@ -113,6 +113,13 @@ for (let x = -23; x <= 23; x++)
 function yWorld(x: number, z: number) {
   return hAt(Math.round(x / cellSize), Math.round(z / cellSize)) + 0.12;
 }
+function playerGroundY(x: number, z: number) {
+  const terrainY = yWorld(x, z);
+  // The farmhouse floor is raised slightly above the terrain, so the farmer's
+  // feet rest on its top surface rather than clipping through its planks.
+  const onFarmhouseFloor = x > 5.9 && x < 14.1 && z > -8.1 && z < -1.9;
+  return onFarmhouseFloor ? Math.max(terrainY, yWorld(10, -5) + 0.23) : terrainY;
+}
 const trunk = new THREE.MeshStandardMaterial({ color: 0x68482d }),
   leaf = new THREE.MeshStandardMaterial({ color: 0x246946, flatShading: true }),
   rockM = new THREE.MeshStandardMaterial({
@@ -1132,7 +1139,38 @@ let vy = 0,
   storedBales = 0;
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
-  hasMilkBucket = false;
+  hasMilkBucket = false,
+  resting: "sitting" | "lying" | null = null;
+const couchSpot = new THREE.Vector2(10, -6.45);
+const bedSpot = new THREE.Vector2(7.4, -2.95);
+function restOnFurniture(mode: "sitting" | "lying") {
+  resting = mode;
+  vy = 0;
+  if (mode === "sitting") {
+    hero.position.set(couchSpot.x, playerGroundY(couchSpot.x, couchSpot.y) + 0.84, couchSpot.y);
+    hero.rotation.set(0, 0, 0);
+    legs.forEach((leg) => (leg.rotation.x = -1.35));
+    arms.forEach((arm) => (arm.rotation.x = 0.35));
+    toast.textContent = "The farmer sits down on the couch. Press E to stand.";
+  } else {
+    hero.position.set(bedSpot.x, playerGroundY(bedSpot.x, bedSpot.y) + 0.92, bedSpot.y);
+    hero.rotation.set(Math.PI / 2, 0, 0);
+    legs.forEach((leg) => (leg.rotation.x = 0));
+    arms.forEach((arm) => (arm.rotation.x = 0));
+    toast.textContent = "The farmer lies down on the bed. Press E to get up.";
+  }
+}
+function standUp() {
+  const previousRest = resting;
+  resting = null;
+  hero.rotation.set(0, 0, 0);
+  if (previousRest === "sitting") hero.position.z = couchSpot.y - 0.85;
+  if (previousRest === "lying") hero.position.z = bedSpot.y - 1.15;
+  hero.position.y = playerGroundY(hero.position.x, hero.position.z);
+  legs.forEach((leg) => (leg.rotation.x = 0));
+  arms.forEach((arm) => (arm.rotation.x = 0));
+  toast.textContent = "The farmer stands up.";
+}
 const DAY_LENGTH_SECONDS = 20 * 60;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
@@ -1614,7 +1652,8 @@ addEventListener("keydown", (e) => {
   if (
     e.code === "Space" &&
     !driving &&
-    hero.position.y <= yWorld(hero.position.x, hero.position.z) + 0.14
+    !resting &&
+    hero.position.y <= playerGroundY(hero.position.x, hero.position.z) + 0.14
   )
     vy = 6.2;
   if (e.code === "KeyF" && driving && usingLoader) {
@@ -1638,6 +1677,12 @@ addEventListener("keydown", (e) => {
       hero.visible = true;
       hero.position.copy(vehicle.position).add(new THREE.Vector3(1, 0, 0));
       toast.textContent = "You climb down from the vehicle.";
+    } else if (resting) {
+      standUp();
+    } else if (Math.hypot(hero.position.x - couchSpot.x, hero.position.z - couchSpot.y) <= 1.45) {
+      restOnFurniture("sitting");
+    } else if (Math.hypot(hero.position.x - bedSpot.x, hero.position.z - bedSpot.y) <= 1.45) {
+      restOnFurniture("lying");
     } else if (interactWithFridge()) {
       // The kitchen interaction takes precedence over vehicles beyond the house.
     } else if (hero.position.distanceTo(tractor.position) < 2.5) {
@@ -2056,8 +2101,17 @@ function loop() {
     (cow) => cow.position.distanceTo(hero.position) <= 2,
   );
   const nearFridge = refrigerator && hero.position.distanceTo(refrigerator.position) <= 2;
-  milkPrompt.hidden = driving || (!nearbyCow && !nearFridge) || Boolean(milkingCow);
-  if (nearFridge)
+  const nearCouch = Math.hypot(hero.position.x - couchSpot.x, hero.position.z - couchSpot.y) <= 1.45;
+  const nearBed = Math.hypot(hero.position.x - bedSpot.x, hero.position.z - bedSpot.y) <= 1.45;
+  milkPrompt.hidden =
+    driving || (!nearbyCow && !nearFridge && !nearCouch && !nearBed && !resting) || Boolean(milkingCow);
+  if (resting)
+    milkPrompt.innerHTML = resting === "sitting" ? "PRESS <b>E</b> TO STAND" : "PRESS <b>E</b> TO GET UP";
+  else if (nearCouch)
+    milkPrompt.innerHTML = "PRESS <b>E</b> TO SIT ON COUCH";
+  else if (nearBed)
+    milkPrompt.innerHTML = "PRESS <b>E</b> TO LIE ON BED";
+  else if (nearFridge)
     milkPrompt.innerHTML = fridgeOpen
       ? hasMilkBucket
         ? milk > 0
@@ -2116,7 +2170,7 @@ function loop() {
   if (keys.has("ArrowDown")) dz += 1;
   if (keys.has("ArrowLeft")) dx -= 1;
   if (keys.has("ArrowRight")) dx += 1;
-  if (!milkingCow && (dx || dz)) {
+  if (!milkingCow && !resting && (dx || dz)) {
     const l = Math.hypot(dx, dz);
     dx /= l;
     dz /= l;
@@ -2141,18 +2195,20 @@ function loop() {
     arms.forEach((arm, index) => {
       arm.rotation.x = (index === 0 ? -1 : 1) * stride * 0.75;
     });
-  } else if (!milkingCow) {
+  } else if (!milkingCow && !resting) {
     legs.forEach((leg) => (leg.rotation.x *= 0.75));
     arms.forEach((arm) => (arm.rotation.x *= 0.75));
   }
   hero.position.x = Math.max(-51, Math.min(51, hero.position.x));
   hero.position.z = Math.max(-51, Math.min(51, hero.position.z));
-  vy -= 15 * dt;
-  hero.position.y += vy * dt;
-  const floor = yWorld(hero.position.x, hero.position.z);
-  if (hero.position.y < floor) {
-    hero.position.y = floor;
-    vy = 0;
+  if (!resting) {
+    vy -= 15 * dt;
+    hero.position.y += vy * dt;
+    const floor = playerGroundY(hero.position.x, hero.position.z);
+    if (hero.position.y < floor) {
+      hero.position.y = floor;
+      vy = 0;
+    }
   }
   (beacon.userData.sails as THREE.Group).rotation.z = t * 0.8;
   shards.forEach((s) => {
