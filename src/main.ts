@@ -7,6 +7,8 @@ document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><p>FARM MARKET</p><h2>Hay Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><button id="sellBale">SELL 1 BALE</button></aside>`,
 );
+document.querySelector("#sleep")!.outerHTML =
+  `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87c7db);
@@ -826,7 +828,9 @@ let vy = 0,
   bales = 0,
   fedBales = 0,
   coins = 0,
+  dayElapsed = 0,
   storedBales = 0;
+const DAY_LENGTH_SECONDS = 20 * 60;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
 const baleObjects: THREE.Mesh[] = [],
@@ -847,6 +851,7 @@ const toast = document.querySelector("#toast")!,
   balesLabel = document.querySelector("#bales")!,
   fedBalesLabel = document.querySelector("#fedBales")!,
   coinsLabel = document.querySelector("#coins")!,
+  dayTimerLabel = document.querySelector("#dayTimer")!,
   storedLabel = document.querySelector("#stored")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
@@ -857,6 +862,12 @@ function refreshFarm() {
   coinsLabel.textContent = String(coins);
   storedLabel.textContent = String(storedBales);
   shardLabel.textContent = String(shardCount);
+}
+function refreshDayTimer() {
+  const remaining = Math.max(0, Math.ceil(DAY_LENGTH_SECONDS - dayElapsed));
+  dayTimerLabel.textContent = `${Math.floor(remaining / 60)}:${String(
+    remaining % 60,
+  ).padStart(2, "0")}`;
 }
 function feedHerdBale(bale: THREE.Mesh) {
   if (cattle.length === 0 || fedBales >= 3) return false;
@@ -1251,7 +1262,7 @@ marketToggle.addEventListener("click", () => {
   marketplace.hidden = !marketplace.hidden;
 });
 document.querySelector<HTMLButtonElement>("#sellBale")!.addEventListener("click", sellBale);
-document.querySelector("#sleep")!.addEventListener("click", () => {
+function endDay() {
   if (cattle.length > 0 && fedBales < 3) {
     const herdSize = cattle.length;
     cattle.forEach((cow) => scene.remove(cow));
@@ -1270,8 +1281,9 @@ document.querySelector("#sleep")!.addEventListener("click", () => {
   refreshFarm();
   if (cattle.length > 0)
     toast.textContent = `Day ${farmDay}: feed the herd three bales before ending the day.`;
-});
+}
 refreshFarm();
+refreshDayTimer();
 const youngWheatColor = new THREE.Color(0x4f913f),
   ripeWheatColor = new THREE.Color(0xd8b34a);
 function tintPlantedWheat() {
@@ -1573,6 +1585,12 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
   const speed = keys.has("ShiftLeft") ? 10 : 5;
+  dayElapsed += dt;
+  if (dayElapsed >= DAY_LENGTH_SECONDS) {
+    dayElapsed -= DAY_LENGTH_SECONDS;
+    endDay();
+  }
+  refreshDayTimer();
   updateCattle(dt, t);
   let dx = 0,
     dz = 0;
