@@ -1263,13 +1263,15 @@ marketToggle.addEventListener("click", () => {
 });
 document.querySelector<HTMLButtonElement>("#sellBale")!.addEventListener("click", sellBale);
 function endDay() {
+  let dayReport = "";
   if (cattle.length > 0 && fedBales < 3) {
-    const herdSize = cattle.length;
-    cattle.forEach((cow) => scene.remove(cow));
-    cattle.splice(0, cattle.length);
-    cattleCare = 0;
-    questText.textContent = "The herd died after going without its three daily bales.";
-    toast.textContent = `${herdSize} cattle died. Feed three bales every day to protect a herd.`;
+    const deaths = Math.min(cattle.length, 3 - fedBales);
+    const lostCattle = cattle.splice(0, deaths);
+    lostCattle.forEach((cow) => scene.remove(cow));
+    cattleCare = Math.max(0, cattleCare - deaths * 15);
+    questText.textContent =
+      "Some cattle died from hunger. Feed all three daily bales to protect the rest.";
+    dayReport = `${deaths} cattle died from hunger. ${cattle.length} remain.`;
   } else if (cattle.length > 0) {
     cattleCare = Math.min(100, cattleCare + 6);
     questText.textContent = "Make three more bales before the next day ends.";
@@ -1280,7 +1282,9 @@ function endDay() {
   fedBales = 0;
   refreshFarm();
   if (cattle.length > 0)
-    toast.textContent = `Day ${farmDay}: feed the herd three bales before ending the day.`;
+    toast.textContent = dayReport
+      ? `${dayReport} Day ${farmDay}: feed three bales to the remaining herd.`
+      : `Day ${farmDay}: feed the herd three bales before ending the day.`;
 }
 refreshFarm();
 refreshDayTimer();
