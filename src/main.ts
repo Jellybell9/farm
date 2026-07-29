@@ -10,7 +10,7 @@ class NeonRunner {
   private readonly clock = new THREE.Clock()
 
   private readonly roadSegments: THREE.Mesh[] = []
-  private readonly obstacles: THREE.Mesh[] = []
+  private readonly obstacles: THREE.Object3D[] = []
   private playerGroup!: THREE.Group
   private readonly overlay: HTMLDivElement
   private readonly overlayText: HTMLParagraphElement
@@ -81,6 +81,12 @@ class NeonRunner {
 
     this.bindInput()
     window.addEventListener('resize', () => this.onResize())
+
+    window.setTimeout(() => {
+      if (this.state !== 'running') {
+        this.startGame()
+      }
+    }, 250)
 
     this.animate()
   }
@@ -179,7 +185,7 @@ class NeonRunner {
     this.updateHud()
     this.obstacles.splice(0)
     this.scene.children.forEach((child: THREE.Object3D) => {
-      if (child instanceof THREE.Mesh && child.userData.obstacle) {
+      if (child.userData.obstacle) {
         this.scene.remove(child)
       }
     })
@@ -211,23 +217,23 @@ class NeonRunner {
     }
 
     this.roadSegments.forEach((segment) => {
-      segment.position.z += this.speed * delta
-      if (segment.position.z > this.roadLength * 1.5) {
-        segment.position.z -= this.roadLength * 4
+      segment.position.z -= this.speed * delta
+      if (segment.position.z < -this.roadLength * 1.5) {
+        segment.position.z += this.roadLength * 4
       }
     })
 
     for (let index = this.obstacles.length - 1; index >= 0; index -= 1) {
       const obstacle = this.obstacles[index]
-      obstacle.position.z += this.speed * delta * 1.08
-      if (obstacle.position.z > 24) {
+      obstacle.position.z -= this.speed * delta * 0.6
+      if (obstacle.position.z < -18) {
         this.scene.remove(obstacle)
         this.obstacles.splice(index, 1)
       }
     }
 
     this.playerGroup.position.x = THREE.MathUtils.lerp(this.playerGroup.position.x, this.lanes[this.targetLane], 0.2)
-    this.playerGroup.position.z -= this.speed * delta * 0.12
+    this.playerGroup.position.z += this.speed * delta * 0.18
 
     if (this.jumpRequested && this.jumpTime <= 0) {
       this.jumpTime = this.jumpDuration
@@ -252,15 +258,30 @@ class NeonRunner {
 
   private spawnObstacle(): void {
     const lane = Math.floor(Math.random() * this.lanes.length)
-    const obstacle = new THREE.Mesh(
+    const obstacle = new THREE.Group()
+
+    const body = new THREE.Mesh(
       new THREE.BoxGeometry(1.2, 1.2, 1.2),
       new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0x3f0d1f, roughness: 0.25, metalness: 0.25 })
     )
-    obstacle.position.set(this.lanes[lane], 0.9, 26)
-    obstacle.castShadow = true
-    obstacle.receiveShadow = true
+    body.castShadow = true
+    body.receiveShadow = true
+
+    const cap = new THREE.Mesh(
+      new THREE.BoxGeometry(1.05, 0.3, 1.05),
+      new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0x4f2d09, roughness: 0.4, metalness: 0.2 })
+    )
+    cap.position.set(0, 0.75, 0)
+    cap.castShadow = true
+
+    const glow = new THREE.PointLight(0xff4d6d, 10, 6, 2)
+    glow.position.set(0, 0.6, 0)
+
+    obstacle.add(body, cap, glow)
+    obstacle.position.set(this.lanes[lane], 0.9, 20)
     obstacle.userData.obstacle = true
     obstacle.userData.lane = lane
+
     this.scene.add(obstacle)
     this.obstacles.push(obstacle)
   }
