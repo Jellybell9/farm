@@ -284,12 +284,26 @@ function farmhouse(x: number, z: number) {
   scene.add(sink);
   refrigerator = new THREE.Group();
   refrigerator.position.set(x + 3.35, y + 1.18, z + 1.48);
-  const fridgeBody = new THREE.Mesh(
-    new THREE.BoxGeometry(0.88, 2.2, 0.78),
-    new THREE.MeshStandardMaterial({ color: 0xe4ebe4, metalness: 0.15, roughness: 0.38 }),
-  );
-  fridgeBody.position.y = 1.1;
-  refrigerator.add(fridgeBody);
+  const fridgeMat = new THREE.MeshStandardMaterial({
+    color: 0xe4ebe4,
+    metalness: 0.15,
+    roughness: 0.38,
+  });
+  // Build the refrigerator as a shallow cabinet rather than a solid block so
+  // the milk pail is visible on its shelf when the door is open.
+  const fridgeParts = [
+    [0, 1.1, 0.34, 0.88, 2.2, 0.1],
+    [-0.4, 1.1, 0, 0.08, 2.2, 0.78],
+    [0.4, 1.1, 0, 0.08, 2.2, 0.78],
+    [0, 0.04, 0, 0.88, 0.08, 0.78],
+    [0, 2.16, 0, 0.88, 0.08, 0.78],
+    [0, 0.72, 0.02, 0.74, 0.06, 0.62],
+  ];
+  fridgeParts.forEach(([px, py, pz, w, h, d]) => {
+    const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), fridgeMat);
+    part.position.set(px, py, pz);
+    refrigerator!.add(part);
+  });
   refrigeratorDoor = new THREE.Group();
   refrigeratorDoor.position.set(-0.4, 1.12, -0.42);
   const fridgeFront = new THREE.Mesh(
@@ -942,7 +956,13 @@ const bucketHandle = new THREE.Mesh(
 bucketHandle.position.set(0, 0.26, 0);
 bucketHandle.rotation.x = Math.PI / 2;
 milkBucket.add(bucket, bucketMilk, bucketHandle);
-milkBucket.position.set(7.3, yWorld(7.3, -6.2) + 0.01, -6.2);
+// The bucket begins on the refrigerator's lower shelf, ready to be picked up.
+const fridgePosition = (refrigerator as THREE.Group | null)?.position;
+if (fridgePosition) {
+  milkBucket.position.copy(fridgePosition).add(new THREE.Vector3(0, 0.06, -0.18));
+} else {
+  milkBucket.position.set(7.3, yWorld(7.3, -6.2) + 0.01, -6.2);
+}
 hero.add(
   coat,
   jeansWaist,
@@ -1377,7 +1397,7 @@ function farmAction() {
         return;
       }
       if (!hasMilkBucket) {
-        toast.textContent = "Pick up the milk bucket by the barn first (P).";
+        toast.textContent = "Pick up the milk bucket from the refrigerator first (P).";
         return;
       }
       if (milk > 0) {
