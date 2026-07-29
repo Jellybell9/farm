@@ -556,25 +556,10 @@ const creatures = [
   creature(-12, 13, 0xd6ac7c),
   creature(14, 9, 0x899e76),
 ];
-const shirtCanvas = document.createElement("canvas");
-shirtCanvas.width = shirtCanvas.height = 64;
-const shirtContext = shirtCanvas.getContext("2d")!;
-shirtContext.fillStyle = "#2767b5";
-shirtContext.fillRect(0, 0, 64, 64);
-for (let y = 0; y < 64; y += 8) {
-  for (let x = 0; x < 64; x += 8) {
-    if ((x / 8 + y / 8) % 2 === 0) {
-      shirtContext.fillStyle = "#173e75";
-      shirtContext.fillRect(x, y, 8, 8);
-    }
-  }
-}
-const shirtTexture = new THREE.CanvasTexture(shirtCanvas);
-shirtTexture.colorSpace = THREE.SRGBColorSpace;
 const hero = new THREE.Group(),
   denim = new THREE.MeshStandardMaterial({ color: 0x2460ad, roughness: 0.8 }),
   flannel = new THREE.MeshStandardMaterial({
-    map: shirtTexture,
+    color: 0x2767b5,
     roughness: 0.85,
   }),
   leather = new THREE.MeshStandardMaterial({
