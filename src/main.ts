@@ -2,7 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
-app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`;
+app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Drive the orange combine through ripe wheat to harvest it.</div></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><button class="market-close" id="marketClose" aria-label="Close marketplace">×</button><p>FARM MARKET</p><h2>Farm Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><div>Chilled milk <b>15</b></div><button id="sellBale">SELL 1 BALE</button><button id="sellMilk">SELL 1 MILK</button></aside>`,
@@ -19,7 +19,7 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
-  `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Controls</b><span>Arrow keys move or drive. Drag to look around. Hold Shift to sprint, press Space to jump, E to interact or enter a vehicle, P to pick up, and F to place a bale from the loader.</span></section><section><b>Harvest wheat</b><span>Walk into a ripe field and press E, or drive the orange combine through it. Use the green tractor to collect sheaves and make bales.</span></section><section><b>Drive farm equipment</b><span>Press E beside a tractor, combine, planter, or loader to get in or out. Arrow keys drive; the blue loader lifts and places bales with F.</span></section><section><b>Care for cows</b><span>Bring the bucket to a cow and press E to milk it. One pail at a time: open the kitchen fridge with E, then press E again to chill the milk before milking another cow.</span></section><section><b>Feed & sell farm goods</b><span>Place bales in the pasture for cows, or open Marketplace to sell loose bales and chilled milk for coins.</span></section></aside>`,
+  `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Controls</b><span>Arrow keys move or drive. Drag to look around. Hold Shift to sprint, press Space to jump, E to interact or enter a vehicle, P to pick up, and F to place a bale from the loader.</span></section><section><b>Harvest wheat</b><span>Drive the orange combine through ripe wheat to harvest it. Use the green tractor to collect sheaves and make bales.</span></section><section><b>Drive farm equipment</b><span>Press E beside a tractor, combine, planter, or loader to get in or out. Arrow keys drive; the blue loader lifts and places bales with F.</span></section><section><b>Care for cows</b><span>Bring the bucket to a cow and press E to milk it. One pail at a time: open the kitchen fridge with E, then press E again to chill the milk before milking another cow.</span></section><section><b>Feed & sell farm goods</b><span>Place bales in the pasture for cows, or open Marketplace to sell loose bales and chilled milk for coins.</span></section></aside>`,
 );
 
 const scene = new THREE.Scene();
@@ -1550,19 +1550,7 @@ function farmAction() {
     hero.position.z > 2 &&
     hero.position.z < 18;
   if (inField) {
-    if (ripePlots === 0) {
-      toast.textContent = "These plots need another day to grow.";
-      return;
-    }
-    ripePlots--;
-    cropMaturity = Math.max(0.16, cropMaturity - 0.075);
-    wheat += 2;
-    shardCount++;
-    dropHarvest();
-    refreshFarm();
-    toast.textContent = "Harvested wheat dropped at your feet.";
-    questText.textContent =
-      "Collect wheat with the tractor, make bales, then feed the herd.";
+    toast.textContent = "Use the orange combine to harvest this wheat field.";
     return;
   }
   if (inPasture) {
