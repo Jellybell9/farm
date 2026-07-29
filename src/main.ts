@@ -679,10 +679,10 @@ const hatBand = new THREE.Mesh(
 );
 hatBand.position.y = 1.59;
 for (const x of [-0.125, 0.125]) {
-  const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.3, 5, 8), denim);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.62, 10), denim);
   leg.position.set(x, 0.32, 0);
   const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.29), boot);
-  shoe.position.set(x, 0.09, -0.06);
+  shoe.position.set(x, 0.08, -0.06);
   hero.add(leg, shoe);
 }
 for (const x of [-0.32, 0.32]) {
