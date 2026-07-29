@@ -1147,9 +1147,14 @@ function restOnFurniture(mode: "sitting" | "lying") {
   resting = mode;
   vy = 0;
   if (mode === "sitting") {
-    hero.position.set(couchSpot.x, playerGroundY(couchSpot.x, couchSpot.y) + 0.84, couchSpot.y);
-    hero.rotation.set(0, 0, 0);
-    legs.forEach((leg) => (leg.rotation.x = -1.35));
+    // Sit back on the cushion and stretch both legs onto the coffee-table footrest.
+    hero.position.set(
+      couchSpot.x,
+      playerGroundY(couchSpot.x, couchSpot.y) + 0.04,
+      couchSpot.y + 0.22,
+    );
+    hero.rotation.set(0, Math.PI, 0);
+    legs.forEach((leg) => (leg.rotation.x = 1.28));
     arms.forEach((arm) => (arm.rotation.x = 0.35));
     toast.textContent = "The farmer sits down on the couch. Press E to stand.";
   } else {
