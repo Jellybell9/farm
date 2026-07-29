@@ -13,6 +13,10 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
+document.querySelector(".ui")!.insertAdjacentHTML(
+  "beforeend",
+  `<div class="interact-prompt" id="milkPrompt" hidden>PRESS <b>E</b> TO MILK COW</div>`,
+);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87c7db);
@@ -898,7 +902,8 @@ const toast = document.querySelector("#toast")!,
   fedBalesLabel = document.querySelector("#fedBales")!,
   coinsLabel = document.querySelector("#coins")!,
   dayTimerLabel = document.querySelector("#dayTimer")!,
-  storedLabel = document.querySelector("#stored")!;
+  storedLabel = document.querySelector("#stored")!,
+  milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = String(milk);
@@ -1225,9 +1230,11 @@ function farmAction() {
       milkingElapsed = 0;
       nearestCow.userData.milking = true;
       hero.rotation.y = Math.atan2(
-        nearestCow.position.x - hero.position.x,
-        nearestCow.position.z - hero.position.z,
+        hero.position.x - nearestCow.position.x,
+        hero.position.z - nearestCow.position.z,
       );
+      hero.remove(milkBucket);
+      scene.add(milkBucket);
       milkBucket.visible = true;
       milkStream.visible = true;
       toast.textContent = "The farmer kneels down and starts milking the cow.";
@@ -1677,6 +1684,10 @@ function loop() {
   }
   refreshDayTimer();
   updateCattle(dt, t);
+  const nearbyCow = cattle.find(
+    (cow) => cow.position.distanceTo(hero.position) <= 2,
+  );
+  milkPrompt.hidden = driving || !nearbyCow || Boolean(milkingCow);
   if (milkingCow) {
     milkingElapsed += dt;
     hero.scale.y = 0.7;
@@ -1691,6 +1702,7 @@ function loop() {
     const udderPosition = milkingCow.localToWorld(
       new THREE.Vector3(0, 0.29, -0.12),
     );
+    milkBucket.position.copy(udderPosition).add(new THREE.Vector3(0, -0.72, 0));
     milkStream.position.copy(udderPosition).add(new THREE.Vector3(0, -0.225, 0));
     milkStream.visible = true;
     if (milkingElapsed >= 2.4) {
@@ -1699,6 +1711,9 @@ function loop() {
       milkingCow = null;
       milkStream.visible = false;
       milkBucket.visible = false;
+      scene.remove(milkBucket);
+      hero.add(milkBucket);
+      milkBucket.position.set(0.28, 0.04, -0.42);
       hero.scale.y = 1;
       coat.position.y = 0.72;
       milk++;
