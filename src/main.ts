@@ -166,6 +166,12 @@ class NeonRunner {
         this.startGame()
       }
     })
+
+    window.addEventListener('keyup', (event) => {
+      if (event.code === 'ArrowLeft' || event.code === 'ArrowRight' || event.code === 'KeyA' || event.code === 'KeyD') {
+        event.preventDefault()
+      }
+    })
   }
 
   private onResize(): void {
@@ -232,7 +238,7 @@ class NeonRunner {
       }
     }
 
-    this.playerGroup.position.x = THREE.MathUtils.lerp(this.playerGroup.position.x, this.lanes[this.targetLane], 0.2)
+    this.playerGroup.position.x = THREE.MathUtils.lerp(this.playerGroup.position.x, this.lanes[this.targetLane], 0.22)
     this.playerGroup.position.z += this.speed * delta * 0.18
 
     if (this.jumpRequested && this.jumpTime <= 0) {
