@@ -836,6 +836,7 @@ const bucketMilk = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xfff8df, roughness: 0.55 }),
 );
 bucketMilk.position.y = 0.24;
+bucketMilk.visible = false;
 const bucketHandle = new THREE.Mesh(
   new THREE.TorusGeometry(0.14, 0.018, 6, 12, Math.PI),
   bucketMetal,
@@ -1781,6 +1782,7 @@ function loop() {
       milkingCow.userData.milkedToday = true;
       milkingCow = null;
       milkStream.visible = false;
+      bucketMilk.visible = true;
       scene.remove(milkBucket);
       hero.add(milkBucket);
       milkBucket.position.set(0.32, 0.42, -0.26);
