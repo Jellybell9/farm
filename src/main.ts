@@ -119,6 +119,13 @@ const trunk = new THREE.MeshStandardMaterial({ color: 0x68482d }),
     color: 0x6f7d7c,
     flatShading: true,
   });
+type CircleCollider = { x: number; z: number; radius: number };
+type BoxCollider = { x: number; z: number; width: number; depth: number };
+const solidCircles: CircleCollider[] = [];
+const solidBoxes: BoxCollider[] = [];
+function addSolidBox(x: number, z: number, width: number, depth: number) {
+  solidBoxes.push({ x, z, width, depth });
+}
 function tree(x: number, z: number, scale = 1) {
   const y = yWorld(x, z);
   const g = new THREE.Group();
@@ -138,6 +145,7 @@ function tree(x: number, z: number, scale = 1) {
     if (o instanceof THREE.Mesh) o.castShadow = true;
   });
   scene.add(g);
+  solidCircles.push({ x, z, radius: 0.3 + scale * 0.2 });
 }
 function rock(x: number, z: number) {
   const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), rockM);
@@ -145,6 +153,7 @@ function rock(x: number, z: number) {
   r.scale.set(1.4, 0.75, 1);
   r.castShadow = true;
   scene.add(r);
+  solidCircles.push({ x, z, radius: 0.52 });
 }
 for (let i = 0; i < 180; i++) {
   const x = (Math.random() - 0.5) * 96,
@@ -204,9 +213,14 @@ function barn(x: number, z: number) {
   addBox(barnRed, x, y + wallHeight / 2, z - depth / 2 + 0.12, width, wallHeight, 0.24);
   addBox(barnRed, x - width / 2 + 0.12, y + wallHeight / 2, z, 0.24, wallHeight, depth);
   addBox(barnRed, x + width / 2 - 0.12, y + wallHeight / 2, z, 0.24, wallHeight, depth);
+  addSolidBox(x, z - depth / 2 + 0.12, width, 0.24);
+  addSolidBox(x - width / 2 + 0.12, z, 0.24, depth);
+  addSolidBox(x + width / 2 - 0.12, z, 0.24, depth);
   // Timber posts make four generous parking bays without enclosing them.
   for (const px of [x - width / 2 + 0.3, x - 3.75, x, x + 3.75, x + width / 2 - 0.3])
     addBox(farmWood, px, y + 2.15, z + depth / 2 - 0.3, 0.28, 4.3, 0.28);
+  for (const px of [x - width / 2 + 0.3, x - 3.75, x, x + 3.75, x + width / 2 - 0.3])
+    solidCircles.push({ x: px, z: z + depth / 2 - 0.3, radius: 0.2 });
   // A simple gable roof follows the rectangular wall footprint exactly.
   const roofOverhang = 0.22,
     halfRoofWidth = width / 2 + roofOverhang,
@@ -260,6 +274,11 @@ function farmhouse(x: number, z: number) {
   // Short dividers define the private rooms without closing them off.
   addBox(wall, x - 1.2, y + 1.25, z + 1.6, 0.18, 2.5, 2.7);
   addBox(wall, x + 1.2, y + 1.25, z + 1.6, 0.18, 2.5, 2.7);
+  addSolidBox(x, z + 2.95, 8.2, 0.22);
+  addSolidBox(x - 4, z + 1.85, 0.22, 2.2);
+  addSolidBox(x + 4, z + 1.85, 0.22, 2.2);
+  addSolidBox(x - 1.2, z + 1.6, 0.18, 2.7);
+  addSolidBox(x + 1.2, z + 1.6, 0.18, 2.7);
 
   // Four timber posts and a roof matched to the actual house footprint.
   for (const [px, pz] of [
@@ -356,9 +375,24 @@ function farmhouse(x: number, z: number) {
   addBox(trim, x, y + 0.36, z - 0.35, 1.25, 0.48, 0.8);
   addBox(charcoal, x, y + 1.05, z + 2.76, 1.05, 1.7, 0.3);
   addBox(new THREE.MeshStandardMaterial({ color: 0xe2a24c, emissive: 0x5c260c }), x, y + 0.72, z + 2.55, 0.52, 0.62, 0.08);
+  // Furniture is solid too, so the open rooms still feel like real spaces.
+  addSolidBox(x - 2.6, z + 2.05, 2.15, 1.65); // bed
+  addSolidBox(x - 3.65, z + 0.75, 0.48, 0.48); // bedside table
+  addSolidBox(x + 2.65, z + 2.55, 2.55, 0.68); // kitchen counter
+  addSolidBox(x + 3.35, z + 1.48, 0.88, 0.78); // refrigerator
+  addSolidBox(x, z - 1.45, 2.35, 0.72); // sofa
+  addSolidBox(x, z - 0.35, 1.25, 0.8); // coffee table
+  addSolidBox(x, z + 2.76, 1.05, 0.3); // fireplace
 }
-function fenceLine(x: number, z: number, length: number, vertical: boolean) {
+function fenceLine(
+  x: number,
+  z: number,
+  length: number,
+  vertical: boolean,
+  gateAt = -10,
+) {
   for (let i = 0; i < length; i++) {
+    if (Math.abs(i - gateAt) <= 1) continue;
     const px = x + (vertical ? 0 : i * 0.9),
       pz = z + (vertical ? i * 0.9 : 0),
       y = yWorld(px, pz);
@@ -372,6 +406,7 @@ function fenceLine(x: number, z: number, length: number, vertical: boolean) {
       vertical ? 0.9 : 0.08,
     );
     addBox(fence, px, y + 0.38, pz, 0.1, 0.75, 0.1);
+    addSolidBox(px, pz, vertical ? 0.1 : 0.9, vertical ? 0.9 : 0.1);
   }
 }
 barn(10, -25);
@@ -544,6 +579,53 @@ loader.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
 scene.add(loader);
+function canStandAt(x: number, z: number, radius = 0.32) {
+  if (
+    solidCircles.some(
+      (obstacle) => Math.hypot(x - obstacle.x, z - obstacle.z) < radius + obstacle.radius,
+    )
+  )
+    return false;
+  if (
+    solidBoxes.some((obstacle) => {
+      const nearestX = THREE.MathUtils.clamp(
+        x,
+        obstacle.x - obstacle.width / 2,
+        obstacle.x + obstacle.width / 2,
+      );
+      const nearestZ = THREE.MathUtils.clamp(
+        z,
+        obstacle.z - obstacle.depth / 2,
+        obstacle.z + obstacle.depth / 2,
+      );
+      return Math.hypot(x - nearestX, z - nearestZ) < radius;
+    })
+  )
+    return false;
+  if (
+    cattle.some(
+      (cow) => Math.hypot(x - cow.position.x, z - cow.position.z) < radius + 0.72,
+    )
+  )
+    return false;
+  // Parked vehicles are solid too, but do not block the player while driving one.
+  if (!driving) {
+    const vehicleCollisionRadii = [
+      [tractor, 1.05],
+      [harvester, 1.35],
+      [planter, 1.05],
+      [loader, 1.05],
+    ] as const;
+    if (
+      vehicleCollisionRadii.some(
+        ([vehicle, vehicleRadius]) =>
+          Math.hypot(x - vehicle.position.x, z - vehicle.position.z) < radius + vehicleRadius,
+      )
+    )
+      return false;
+  }
+  return true;
+}
 const baleStack = new THREE.Group();
 baleStack.position.set(3.25, yWorld(3.25, -28.9) + 0.05, -28.9);
 scene.add(baleStack);
@@ -594,7 +676,7 @@ addBox(waterMat, fieldX, fieldY + 0.05, fieldZ + 9, fieldW - 0.6, 0.05, 0.28);
 fenceLine(fieldX - fieldW / 2, fieldZ - fieldD / 2, 41, false);
 fenceLine(fieldX - fieldW / 2, fieldZ - fieldD / 2, 41, true);
 fenceLine(fieldX + fieldW / 2, fieldZ - fieldD / 2, 41, true);
-fenceLine(fieldX - fieldW / 2, fieldZ + fieldD / 2, 41, false);
+fenceLine(fieldX - fieldW / 2, fieldZ + fieldD / 2, 41, false, 37);
 // Hay bales mark the field edge.
 for (const [x, z] of [
   [-38, -38],
@@ -612,7 +694,7 @@ for (const [x, z] of [
 }
 // Pasture: a broad grass pen with room for a larger grazing herd.
 const pasture = { minX: 5, maxX: 24.8, minZ: 3, maxZ: 16.5 };
-fenceLine(pasture.minX, pasture.minZ, 23, false);
+fenceLine(pasture.minX, pasture.minZ, 23, false, 7);
 fenceLine(pasture.minX, pasture.minZ, 16, true);
 fenceLine(pasture.maxX, pasture.minZ, 16, true);
 fenceLine(pasture.minX, pasture.maxZ, 23, false);
@@ -1372,12 +1454,24 @@ function interactWithFridge() {
       : "The refrigerator is open. Bring back fresh milk to chill it.";
     return true;
   }
-  if (milk > 0) {
-    milk--;
-    chilledMilk++;
-    bucketMilk.visible = milk > 0;
-    refreshFarm();
-    toast.textContent = `Put a pail of milk in the refrigerator (${chilledMilk} chilled).`;
+  if (hasMilkBucket) {
+    const pailWasFull = milk > 0;
+    if (pailWasFull) {
+      milk--;
+      chilledMilk++;
+      refreshFarm();
+    }
+    bucketMilk.visible = false;
+    hero.remove(milkBucket);
+    scene.add(milkBucket);
+    milkBucket.position
+      .copy(refrigerator.position)
+      .add(new THREE.Vector3(0, 0.06, -0.18));
+    milkBucket.rotation.set(0, 0, 0);
+    hasMilkBucket = false;
+    toast.textContent = pailWasFull
+      ? `Chilled the milk and returned the pail to the refrigerator (${chilledMilk} chilled).`
+      : "Returned the empty pail to the refrigerator shelf.";
     return true;
   }
   fridgeOpen = false;
@@ -1476,6 +1570,10 @@ function farmAction() {
 function pickUpNearby() {
   if (driving || milkingCow) return;
   if (!hasMilkBucket && hero.position.distanceTo(milkBucket.position) <= 1.65) {
+    if (!fridgeOpen) {
+      toast.textContent = "Open the refrigerator before taking the milk pail.";
+      return;
+    }
     hasMilkBucket = true;
     hero.add(milkBucket);
     milkBucket.position.set(0.32, 0.42, -0.26);
@@ -1961,8 +2059,10 @@ function loop() {
   milkPrompt.hidden = driving || (!nearbyCow && !nearFridge) || Boolean(milkingCow);
   if (nearFridge)
     milkPrompt.innerHTML = fridgeOpen
-      ? milk > 0
-        ? "PRESS <b>E</b> TO STORE MILK"
+      ? hasMilkBucket
+        ? milk > 0
+          ? "PRESS <b>E</b> TO CHILL & RETURN PAIL"
+          : "PRESS <b>E</b> TO RETURN PAIL"
         : "PRESS <b>E</b> TO CLOSE FRIDGE"
       : "PRESS <b>E</b> TO OPEN FRIDGE";
   else if (nearbyCow) milkPrompt.innerHTML = "PRESS <b>E</b> TO MILK COW";
@@ -2024,8 +2124,14 @@ function loop() {
     // make the arrow keys suddenly point in unrelated world directions.
     const moveX = dx * Math.cos(orbitYaw) + dz * Math.sin(orbitYaw);
     const moveZ = -dx * Math.sin(orbitYaw) + dz * Math.cos(orbitYaw);
-    hero.position.x += moveX * speed * dt;
-    hero.position.z += moveZ * speed * dt;
+    const stepX = moveX * speed * dt,
+      stepZ = moveZ * speed * dt;
+    // Resolve each axis separately so the farmer naturally slides along walls
+    // and trunks instead of clipping through them or stopping completely.
+    if (canStandAt(hero.position.x + stepX, hero.position.z))
+      hero.position.x += stepX;
+    if (canStandAt(hero.position.x, hero.position.z + stepZ))
+      hero.position.z += stepZ;
     hero.rotation.y = Math.atan2(-moveX, -moveZ);
     coat.position.y = 0.7 + Math.sin(t * 15) * 0.05;
     const stride = Math.sin(t * 15);
