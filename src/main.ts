@@ -1993,9 +1993,13 @@ function loop() {
     const l = Math.hypot(dx, dz);
     dx /= l;
     dz /= l;
-    hero.position.x += dx * speed * dt;
-    hero.position.z += dz * speed * dt;
-    hero.rotation.y = Math.atan2(-dx, -dz);
+    // Keep movement tied to the player's view: rotating the camera does not
+    // make the arrow keys suddenly point in unrelated world directions.
+    const moveX = dx * Math.cos(orbitYaw) + dz * Math.sin(orbitYaw);
+    const moveZ = -dx * Math.sin(orbitYaw) + dz * Math.cos(orbitYaw);
+    hero.position.x += moveX * speed * dt;
+    hero.position.z += moveZ * speed * dt;
+    hero.rotation.y = Math.atan2(-moveX, -moveZ);
     coat.position.y = 0.7 + Math.sin(t * 15) * 0.05;
     const stride = Math.sin(t * 15);
     legs.forEach((leg, index) => {
