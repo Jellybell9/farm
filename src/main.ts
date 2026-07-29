@@ -578,11 +578,11 @@ const hero = new THREE.Group(),
     roughness: 0.85,
   }),
   leather = new THREE.MeshStandardMaterial({
-    color: 0x164a89,
+    color: 0x6d4228,
     roughness: 0.85,
   }),
   skin = new THREE.MeshStandardMaterial({ color: 0xf0bd91, roughness: 0.8 }),
-  boot = new THREE.MeshStandardMaterial({ color: 0x123563, roughness: 0.9 }),
+  boot = new THREE.MeshStandardMaterial({ color: 0x2b211d, roughness: 0.9 }),
   darkHair = new THREE.MeshStandardMaterial({
     color: 0x34251e,
     roughness: 0.9,
@@ -605,7 +605,7 @@ belt.rotation.x = Math.PI / 2;
 const buckle = new THREE.Mesh(
   new THREE.BoxGeometry(0.1, 0.08, 0.025),
   new THREE.MeshStandardMaterial({
-    color: 0x79a9df,
+    color: 0xd3a33c,
     metalness: 0.45,
     roughness: 0.4,
   }),
@@ -675,7 +675,7 @@ const hatCrown = new THREE.Mesh(
 hatCrown.position.y = 1.69;
 const hatBand = new THREE.Mesh(
   new THREE.CylinderGeometry(0.255, 0.255, 0.055, 14),
-  new THREE.MeshStandardMaterial({ color: 0x78aee0, metalness: 0.15 }),
+  new THREE.MeshStandardMaterial({ color: 0xc19a4a, metalness: 0.15 }),
 );
 hatBand.position.y = 1.59;
 for (const x of [-0.125, 0.125]) {
