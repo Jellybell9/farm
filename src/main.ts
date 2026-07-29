@@ -132,10 +132,12 @@ for (let i = 0; i < 180; i++) {
   const x = (Math.random() - 0.5) * 96,
     z = (Math.random() - 0.5) * 96;
   const insideField = x > -40 && x < -2 && z > -40 && z < -2;
+  const insidePasture = x > 4 && x < 25.8 && z > 2 && z < 17.5;
   if (
     Math.hypot(x, z) < 10 ||
     (Math.abs(x - 27) < 8 && Math.abs(z + 22) < 9) ||
-    insideField
+    insideField ||
+    insidePasture
   )
     continue;
   if (Math.random() > 0.34) tree(x, z, 0.65 + Math.random() * 0.7);
