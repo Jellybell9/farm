@@ -379,7 +379,6 @@ function farmhouse(x: number, z: number) {
   // Living room spans the open front, oriented toward the fireplace on the back wall.
   addBox(sofa, x, y + 0.55, z - 1.45, 2.35, 0.7, 0.72);
   addBox(sofa, x, y + 1.05, z - 1.72, 2.35, 0.48, 0.2);
-  addBox(trim, x, y + 0.36, z - 0.35, 1.25, 0.48, 0.8);
   addBox(charcoal, x, y + 1.05, z + 2.76, 1.05, 1.7, 0.3);
   addBox(new THREE.MeshStandardMaterial({ color: 0xe2a24c, emissive: 0x5c260c }), x, y + 0.72, z + 2.55, 0.52, 0.62, 0.08);
   // Furniture is solid too, so the open rooms still feel like real spaces.
@@ -388,7 +387,6 @@ function farmhouse(x: number, z: number) {
   addSolidBox(x + 2.65, z + 2.55, 2.55, 0.68); // kitchen counter
   addSolidBox(x + 3.35, z + 1.48, 0.88, 0.78); // refrigerator
   addSolidBox(x, z - 1.45, 2.35, 0.72); // sofa
-  addSolidBox(x, z - 0.35, 1.25, 0.8); // coffee table
   addSolidBox(x, z + 2.76, 1.05, 0.3); // fireplace
 }
 function fenceLine(
@@ -1147,14 +1145,14 @@ function restOnFurniture(mode: "sitting" | "lying") {
   resting = mode;
   vy = 0;
   if (mode === "sitting") {
-    // Sit back on the cushion and stretch both legs onto the coffee-table footrest.
+    // Sit naturally on the couch with both feet resting on the floor.
     hero.position.set(
       couchSpot.x,
-      playerGroundY(couchSpot.x, couchSpot.y) + 0.04,
-      couchSpot.y + 0.22,
+      playerGroundY(couchSpot.x, couchSpot.y) + 0.25,
+      couchSpot.y,
     );
     hero.rotation.set(0, Math.PI, 0);
-    legs.forEach((leg) => (leg.rotation.x = 1.28));
+    legs.forEach((leg) => (leg.rotation.x = 0));
     arms.forEach((arm) => (arm.rotation.x = 0.35));
     toast.textContent = "The farmer sits down on the couch. Press E to stand.";
   } else {
