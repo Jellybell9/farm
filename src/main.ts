@@ -203,17 +203,63 @@ function barn(x: number, z: number) {
 }
 function farmhouse(x: number, z: number) {
   const y = yWorld(x, z);
+  // The farmhouse is intentionally open to the yard: a broad living room at
+  // the front, with a tucked-away bedroom and kitchen along the back wall.
   const wall = new THREE.MeshStandardMaterial({ color: 0xe8ddbd });
-  addBox(wall, x, y + 1.3, z, 4.6, 2.6, 3.8);
-  const top = new THREE.Mesh(
-    new THREE.ConeGeometry(3.05, 1.75, 4),
-    new THREE.MeshStandardMaterial({ color: 0x66513e }),
-  );
-  top.position.set(x, y + 3.45, z);
+  const trim = new THREE.MeshStandardMaterial({ color: 0x76543a });
+  const floor = new THREE.MeshStandardMaterial({ color: 0xb9895e });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x66513e });
+  const linen = new THREE.MeshStandardMaterial({ color: 0xe8e0c8 });
+  const quilt = new THREE.MeshStandardMaterial({ color: 0x5c8191 });
+  const cabinet = new THREE.MeshStandardMaterial({ color: 0x7b9b78 });
+  const counter = new THREE.MeshStandardMaterial({ color: 0xd6c7aa });
+  const sofa = new THREE.MeshStandardMaterial({ color: 0x8c604c });
+  const charcoal = new THREE.MeshStandardMaterial({ color: 0x374342 });
+
+  // An oversized plank floor makes the interior feel continuous with the lawn.
+  addBox(floor, x, y + 0.12, z, 8.2, 0.22, 6.2);
+  // Back and side walls frame the rooms, leaving the whole south face open.
+  addBox(wall, x, y + 1.65, z + 2.95, 8.2, 3.3, 0.22);
+  addBox(wall, x - 4, y + 1.65, z + 1.85, 0.22, 3.3, 2.2);
+  addBox(wall, x + 4, y + 1.65, z + 1.85, 0.22, 3.3, 2.2);
+  // Short dividers define the private rooms without closing them off.
+  addBox(wall, x - 1.2, y + 1.25, z + 1.6, 0.18, 2.5, 2.7);
+  addBox(wall, x + 1.2, y + 1.25, z + 1.6, 0.18, 2.5, 2.7);
+
+  // Four timber posts and a high, shallow roof retain the farmhouse silhouette.
+  for (const [px, pz] of [
+    [x - 3.75, z - 2.75], [x + 3.75, z - 2.75],
+    [x - 3.75, z + 2.75], [x + 3.75, z + 2.75],
+  ]) addBox(trim, px, y + 2.05, pz, 0.24, 4.1, 0.24);
+  const top = new THREE.Mesh(new THREE.ConeGeometry(5.25, 2.05, 4), roofMat);
+  top.position.set(x, y + 4.6, z + 0.1);
   top.rotation.y = Math.PI / 4;
   top.castShadow = true;
   scene.add(top);
-  addBox(farmWood, x, y + 0.75, z - 1.92, 0.9, 1.5, 0.07);
+
+  // Bedroom, back left: bed, headboard, and a little bedside table.
+  addBox(trim, x - 2.6, y + 0.5, z + 2.05, 2.15, 0.45, 1.65);
+  addBox(linen, x - 2.6, y + 0.8, z + 1.9, 2.05, 0.25, 1.45);
+  addBox(quilt, x - 2.6, y + 0.94, z + 1.6, 2.02, 0.12, 0.82);
+  addBox(trim, x - 2.6, y + 1.35, z + 2.72, 2.18, 1.3, 0.16);
+  addBox(trim, x - 3.65, y + 0.45, z + 0.75, 0.48, 0.7, 0.48);
+
+  // Kitchen, back right: long counter, sink, stove, and a warm cabinet wall.
+  addBox(cabinet, x + 2.65, y + 0.55, z + 2.55, 2.45, 1.05, 0.58);
+  addBox(counter, x + 2.65, y + 1.12, z + 2.55, 2.55, 0.12, 0.68);
+  addBox(charcoal, x + 3.35, y + 1.24, z + 2.55, 0.58, 0.08, 0.48);
+  const sink = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.055, 6, 12), charcoal);
+  sink.position.set(x + 2.05, y + 1.22, z + 2.55);
+  sink.rotation.x = Math.PI / 2;
+  scene.add(sink);
+  addBox(cabinet, x + 3.55, y + 1.9, z + 2.81, 0.62, 1.55, 0.16);
+
+  // Living room spans the open front, oriented toward the fireplace on the back wall.
+  addBox(sofa, x, y + 0.55, z - 1.45, 2.35, 0.7, 0.72);
+  addBox(sofa, x, y + 1.05, z - 1.72, 2.35, 0.48, 0.2);
+  addBox(trim, x, y + 0.36, z - 0.35, 1.25, 0.48, 0.8);
+  addBox(charcoal, x, y + 1.05, z + 2.76, 1.05, 1.7, 0.3);
+  addBox(new THREE.MeshStandardMaterial({ color: 0xe2a24c, emissive: 0x5c260c }), x, y + 0.72, z + 2.55, 0.52, 0.62, 0.08);
 }
 function fenceLine(x: number, z: number, length: number, vertical: boolean) {
   for (let i = 0; i < length; i++) {
