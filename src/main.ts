@@ -2,7 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
-app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="guide"><b>ARROWS</b> move / drive <b>DRAG</b> look around <b>SHIFT</b> sprint <b>SPACE</b> jump <b>E</b> interact / tractor <b>F</b> drop bale</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`;
+app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><p>FARM MARKET</p><h2>Hay Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><button id="sellBale">SELL 1 BALE</button></aside>`,
@@ -13,13 +13,13 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
-document.querySelector(".guide")!.insertAdjacentHTML(
-  "beforeend",
-  ` <b>P</b> pick up`,
-);
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<div class="interact-prompt" id="milkPrompt" hidden>PRESS <b>E</b> TO MILK COW</div>`,
+);
+document.querySelector(".ui")!.insertAdjacentHTML(
+  "beforeend",
+  `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Controls</b><span>Arrow keys move or drive. Drag to look around. Hold Shift to sprint, press Space to jump, E to interact or enter a vehicle, P to pick up, and F to place a bale from the loader.</span></section><section><b>Harvest wheat</b><span>Walk into a ripe field and press E, or drive the orange combine through it. Use the green tractor to collect sheaves and make bales.</span></section><section><b>Drive farm equipment</b><span>Press E beside a tractor, combine, planter, or loader to get in or out. Arrow keys drive; the blue loader lifts and places bales with F.</span></section><section><b>Care for cows</b><span>Bring the bucket to a cow and press E to milk it. One pail at a time: open the kitchen fridge with E, then press E again to chill the milk before milking another cow.</span></section><section><b>Feed & sell hay</b><span>Place bales in the pasture for cows, or open Marketplace to sell a loose bale for coins.</span></section></aside>`,
 );
 
 const scene = new THREE.Scene();
@@ -1506,9 +1506,18 @@ dropButton.addEventListener("pointerdown", (e) => {
 });
 const marketToggle = document.querySelector<HTMLButtonElement>("#marketToggle")!;
 const marketplace = document.querySelector<HTMLElement>("#marketplace")!;
+const helpButton = document.querySelector<HTMLButtonElement>("#helpButton")!;
+const helpPanel = document.querySelector<HTMLElement>("#helpPanel")!;
+function toggleHelp(show = helpPanel.hidden) {
+  helpPanel.hidden = !show;
+  helpButton.setAttribute("aria-expanded", String(show));
+  helpButton.textContent = show ? "CLOSE HELP" : "? HELP";
+}
 marketToggle.addEventListener("click", () => {
   marketplace.hidden = !marketplace.hidden;
 });
+helpButton.addEventListener("click", () => toggleHelp());
+document.querySelector<HTMLButtonElement>("#helpClose")!.addEventListener("click", () => toggleHelp(false));
 document.querySelector<HTMLButtonElement>("#sellBale")!.addEventListener("click", sellBale);
 function endDay() {
   let dayReport = "";
