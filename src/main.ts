@@ -151,6 +151,8 @@ for (let i = 0; i < 180; i++) {
     z = (Math.random() - 0.5) * 96;
   const insideField = x > -40 && x < -2 && z > -40 && z < -2;
   const insidePasture = x > 4 && x < 25.8 && z > 2 && z < 17.5;
+  // Leave the farmhouse footprint and its open front as a usable yard.
+  const insideHouseGrounds = x > 4.5 && x < 15.5 && z > -9.5 && z < 0.5;
   // Keep the whole barn pad and its north-facing approach clear for machinery.
   const insideBarnGrounds = x > 1.5 && x < 18.5 && z > -31 && z < -17;
   if (
@@ -158,6 +160,7 @@ for (let i = 0; i < 180; i++) {
     (Math.abs(x - 27) < 8 && Math.abs(z + 22) < 9) ||
     insideField ||
     insidePasture ||
+    insideHouseGrounds ||
     insideBarnGrounds
   )
     continue;
@@ -241,7 +244,6 @@ function farmhouse(x: number, z: number) {
   const wall = new THREE.MeshStandardMaterial({ color: 0xe8ddbd });
   const trim = new THREE.MeshStandardMaterial({ color: 0x76543a });
   const floor = new THREE.MeshStandardMaterial({ color: 0xb9895e });
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x66513e });
   const linen = new THREE.MeshStandardMaterial({ color: 0xe8e0c8 });
   const quilt = new THREE.MeshStandardMaterial({ color: 0x5c8191 });
   const cabinet = new THREE.MeshStandardMaterial({ color: 0x7b9b78 });
@@ -259,14 +261,39 @@ function farmhouse(x: number, z: number) {
   addBox(wall, x - 1.2, y + 1.25, z + 1.6, 0.18, 2.5, 2.7);
   addBox(wall, x + 1.2, y + 1.25, z + 1.6, 0.18, 2.5, 2.7);
 
-  // Four timber posts and a high, shallow roof retain the farmhouse silhouette.
+  // Four timber posts and a roof matched to the actual house footprint.
   for (const [px, pz] of [
     [x - 3.75, z - 2.75], [x + 3.75, z - 2.75],
     [x - 3.75, z + 2.75], [x + 3.75, z + 2.75],
   ]) addBox(trim, px, y + 2.05, pz, 0.24, 4.1, 0.24);
-  const top = new THREE.Mesh(new THREE.ConeGeometry(5.25, 2.05, 4), roofMat);
-  top.position.set(x, y + 4.6, z + 0.1);
-  top.rotation.y = Math.PI / 4;
+  const roofOverhang = 0.18,
+    halfRoofWidth = 4.1 + roofOverhang,
+    halfRoofDepth = 3.1 + roofOverhang,
+    roofRise = 2.05;
+  const houseRoofGeometry = new THREE.BufferGeometry();
+  houseRoofGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      [
+        -halfRoofWidth, 0, -halfRoofDepth,
+        halfRoofWidth, 0, -halfRoofDepth,
+        -halfRoofWidth, 0, halfRoofDepth,
+        halfRoofWidth, 0, halfRoofDepth,
+        0, roofRise, -halfRoofDepth,
+        0, roofRise, halfRoofDepth,
+      ],
+      3,
+    ),
+  );
+  houseRoofGeometry.setIndex([
+    0, 1, 4, 2, 5, 3, 0, 4, 5, 0, 5, 2, 1, 3, 5, 1, 5, 4,
+  ]);
+  houseRoofGeometry.computeVertexNormals();
+  const top = new THREE.Mesh(
+    houseRoofGeometry,
+    new THREE.MeshStandardMaterial({ color: 0x66513e, side: THREE.DoubleSide }),
+  );
+  top.position.set(x, y + 3.3, z);
   top.castShadow = true;
   scene.add(top);
 
