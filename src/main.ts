@@ -520,7 +520,12 @@ for (const [cowIndex, [x, z]] of [
   muzzle.position.set(0, 0.79, 1.19);
   muzzle.scale.set(1.05, 0.68, 0.82);
   const headParts: THREE.Object3D[] = [head, muzzle];
-  const cowLegs: { upper: THREE.Mesh; lower: THREE.Mesh }[] = [];
+  const cowLegs: {
+    upper: THREE.Mesh;
+    lower: THREE.Mesh;
+    upperZ: number;
+    lowerZ: number;
+  }[] = [];
   cow.add(body, shoulder, neck, head, muzzle);
   // Staggered, slightly tapered legs give the animal a stable natural stance.
   for (const [legX, legZ, kneeX] of [[-0.35, -0.52, -0.03], [0.35, -0.52, 0.03], [-0.36, 0.48, 0.025], [0.36, 0.48, -0.025]]) {
@@ -533,7 +538,12 @@ for (const [cowIndex, [x, z]] of [
     const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.1, 8), cowBlack);
     hoof.position.set(legX + kneeX, -0.04, legZ + 0.065);
     hoof.scale.set(1, 0.65, 1.28);
-    cowLegs.push({ upper: upperLeg, lower: leg });
+    cowLegs.push({
+      upper: upperLeg,
+      lower: leg,
+      upperZ: upperLeg.position.z,
+      lowerZ: leg.position.z,
+    });
     cow.add(upperLeg, leg, hoof);
   }
   for (const xOffset of [-0.2, 0.2]) {
@@ -565,15 +575,15 @@ for (const [cowIndex, [x, z]] of [
   tailTip.position.set(0.02, 0.11, -0.98);
   cow.add(tail, tailTip);
   const udder = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8), cowUdder);
-  udder.position.set(0, 0.46, -0.12);
-  udder.scale.set(1.2, 0.72, 0.95);
+  udder.position.set(0, 0.3, -0.32);
+  udder.scale.set(1.22, 0.7, 1.15);
   cow.add(udder);
-  for (const [teatX, teatZ] of [[-0.09, -0.2], [0.09, -0.2], [-0.09, -0.04], [0.09, -0.04]]) {
+  for (const [teatX, teatZ] of [[-0.09, -0.4], [0.09, -0.4], [-0.09, -0.24], [0.09, -0.24]]) {
     const teat = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.035, 0.09, 4, 6),
       cowUdder,
     );
-    teat.position.set(teatX, 0.35, teatZ);
+    teat.position.set(teatX, 0.2, teatZ);
     cow.add(teat);
   }
   // Paper-thin decal meshes sit tangent to the hide, avoiding the raised,
@@ -1569,6 +1579,24 @@ function chooseGrazingSpot(cow: THREE.Group) {
     pasture.minZ + 0.8 + Math.random() * (pasture.maxZ - pasture.minZ - 1.6),
   );
 }
+type CowLeg = {
+  upper: THREE.Mesh;
+  lower: THREE.Mesh;
+  upperZ: number;
+  lowerZ: number;
+};
+function animateCowLegs(legs: CowLeg[], stride: number, amount: number) {
+  legs.forEach(({ upper, lower, upperZ, lowerZ }, legIndex) => {
+    const diagonalPhase = legIndex === 0 || legIndex === 3 ? 1 : -1;
+    const swing = stride * diagonalPhase * amount;
+    // The upper leg swings through while the lower leg bends more on its
+    // backward stroke, giving the cow a four-beat, weight-shifting gait.
+    upper.rotation.x = swing;
+    lower.rotation.x = Math.max(0, -swing) * 0.72 - swing * 0.16;
+    upper.position.z = upperZ + swing * 0.075;
+    lower.position.z = lowerZ - swing * 0.055;
+  });
+}
 function updateCattle(dt: number, time: number) {
   cattle.forEach((cow, index) => {
     const grazeParts = cow.userData.grazeParts as {
@@ -1576,12 +1604,9 @@ function updateCattle(dt: number, time: number) {
       y: number;
       z: number;
     }[];
-    const legs = cow.userData.legs as { upper: THREE.Mesh; lower: THREE.Mesh }[];
+    const legs = cow.userData.legs as CowLeg[];
     if (cow.userData.milking) {
-      legs.forEach(({ upper, lower }) => {
-        upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 8);
-        lower.rotation.x = THREE.MathUtils.lerp(lower.rotation.x, 0, dt * 8);
-      });
+      animateCowLegs(legs, 0, 0);
       return;
     }
     cow.userData.stateTimer -= dt;
@@ -1602,11 +1627,7 @@ function updateCattle(dt: number, time: number) {
         ) - Math.PI;
         cow.rotation.y += turn * Math.min(1, dt * 2.5);
         const stride = Math.sin(time * 11 + index * 1.7);
-        legs.forEach(({ upper, lower }, legIndex) => {
-          const phase = legIndex === 0 || legIndex === 3 ? 1 : -1;
-          upper.rotation.x = stride * phase * 0.48;
-          lower.rotation.x = -stride * phase * 0.28;
-        });
+        animateCowLegs(legs, stride, 0.52);
         const step = Math.min(distance, cow.userData.speed * dt);
         cow.position.x += (dx / distance) * step;
         cow.position.z += (dz / distance) * step;
@@ -1615,10 +1636,7 @@ function updateCattle(dt: number, time: number) {
       }
       const eatingTime = (cow.userData.eatingTime as number) + dt;
       cow.userData.eatingTime = eatingTime;
-      legs.forEach(({ upper, lower }) => {
-        upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 6);
-        lower.rotation.x = THREE.MathUtils.lerp(lower.rotation.x, 0, dt * 6);
-      });
+      animateCowLegs(legs, 0, 0);
       const headLowering = 0.28 + Math.sin(time * 8) * 0.035;
       grazeParts.forEach(({ part, y, z }) => {
         part.position.y = THREE.MathUtils.lerp(part.position.y, y - headLowering, dt * 8);
@@ -1634,10 +1652,7 @@ function updateCattle(dt: number, time: number) {
       return;
     }
     if (cow.userData.state === "grazing") {
-      legs.forEach(({ upper, lower }) => {
-        upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 6);
-        lower.rotation.x = THREE.MathUtils.lerp(lower.rotation.x, 0, dt * 6);
-      });
+      animateCowLegs(legs, Math.sin(time * 2.2 + index) * 0.12, 0.16);
       const headLowering = 0.2 + Math.sin(time * 2.2 + index) * 0.025;
       grazeParts.forEach(({ part, y, z }) => {
         part.position.y = THREE.MathUtils.lerp(part.position.y, y - headLowering, dt * 6);
@@ -1670,11 +1685,7 @@ function updateCattle(dt: number, time: number) {
     ) - Math.PI;
     cow.rotation.y += turn * Math.min(1, dt * 2.5);
     const stride = Math.sin(time * 11 + index * 1.7);
-    legs.forEach(({ upper, lower }, legIndex) => {
-      const phase = legIndex === 0 || legIndex === 3 ? 1 : -1;
-      upper.rotation.x = stride * phase * 0.48;
-      lower.rotation.x = -stride * phase * 0.28;
-    });
+    animateCowLegs(legs, stride, 0.52);
     const step = Math.min(distance, cow.userData.speed * dt);
     cow.position.x += (dx / distance) * step;
     cow.position.z += (dz / distance) * step;
@@ -1708,7 +1719,7 @@ function loop() {
       arm.rotation.z = index === 0 ? 0.45 : -0.45;
     });
     const udderPosition = milkingCow.localToWorld(
-      new THREE.Vector3(0, 0.46, -0.12),
+      new THREE.Vector3(0, 0.3, -0.32),
     );
     milkBucket.position.copy(udderPosition);
     milkBucket.position.y =
