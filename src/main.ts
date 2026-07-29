@@ -469,6 +469,7 @@ fenceLine(pasture.minX, pasture.maxZ, 23, false);
 const cowWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.9 });
 const cowBlack = new THREE.MeshStandardMaterial({ color: 0x1e2020, roughness: 0.92 });
 const cowMuzzle = new THREE.MeshStandardMaterial({ color: 0x6c5d60, roughness: 0.95 });
+const cowUdder = new THREE.MeshStandardMaterial({ color: 0xe9a2a7, roughness: 0.9 });
 const cattle: THREE.Group[] = [];
 for (const [cowIndex, [x, z]] of [
   [7, 5],
@@ -559,6 +560,10 @@ for (const [cowIndex, [x, z]] of [
   const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.07, 7, 6), cowBlack);
   tailTip.position.set(0.02, 0.11, -0.98);
   cow.add(tail, tailTip);
+  const udder = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), cowUdder);
+  udder.position.set(0, 0.31, -0.12);
+  udder.scale.set(1.15, 0.65, 0.9);
+  cow.add(udder);
   // Paper-thin decal meshes sit tangent to the hide, avoiding the raised,
   // pebble-like spots created by flattened spheres.
   for (const [spotY, spotZ, spotSize] of [[0.72, -0.3, 0.2], [0.84, 0.26, 0.16], [0.96, -0.02, 0.13]]) {
@@ -789,6 +794,32 @@ for (const x of [-0.32, 0.32]) {
   arms.push(armGroup);
   hero.add(armGroup);
 }
+const milkBucket = new THREE.Group();
+const bucketMetal = new THREE.MeshStandardMaterial({
+  color: 0x9eabb0,
+  metalness: 0.7,
+  roughness: 0.3,
+});
+const bucket = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.16, 0.13, 0.26, 12, 1, true),
+  bucketMetal,
+);
+bucket.position.y = 0.13;
+const bucketMilk = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.125, 0.125, 0.015, 12),
+  new THREE.MeshStandardMaterial({ color: 0xfff8df, roughness: 0.55 }),
+);
+bucketMilk.position.y = 0.24;
+const bucketHandle = new THREE.Mesh(
+  new THREE.TorusGeometry(0.14, 0.018, 6, 12, Math.PI),
+  bucketMetal,
+);
+bucketHandle.position.set(0, 0.26, 0);
+bucketHandle.rotation.x = Math.PI / 2;
+milkBucket.add(bucket, bucketMilk, bucketHandle);
+milkBucket.position.set(0.28, 0.04, -0.42);
+milkBucket.visible = false;
+hero.add(milkBucket);
 hero.add(
   coat,
   jeansWaist,
@@ -809,6 +840,12 @@ hero.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
 scene.add(hero);
+const milkStream = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.022, 0.022, 0.45, 6),
+  new THREE.MeshStandardMaterial({ color: 0xfff8df, emissive: 0x443d29 }),
+);
+milkStream.visible = false;
+scene.add(milkStream);
 const keys = new Set<string>();
 let vy = 0,
   shardCount = 1,
@@ -836,6 +873,8 @@ let vy = 0,
   coins = 0,
   dayElapsed = 0,
   storedBales = 0;
+let milkingCow: THREE.Group | null = null,
+  milkingElapsed = 0;
 const DAY_LENGTH_SECONDS = 20 * 60;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
@@ -1174,17 +1213,24 @@ function farmAction() {
         : nearest,
     );
     if (nearestCow.position.distanceTo(hero.position) <= 2) {
+      if (milkingCow) {
+        toast.textContent = "Finish milking before starting another cow.";
+        return;
+      }
       if (nearestCow.userData.milkedToday) {
         toast.textContent = "This cow has already been milked today.";
         return;
       }
-      nearestCow.userData.milkedToday = true;
-      milk++;
-      cattleCare = Math.min(100, cattleCare + 2);
-      refreshFarm();
-      toast.textContent = `Milk collected! You now have ${milk} pail${milk === 1 ? "" : "s"}.`;
-      questText.textContent =
-        "Milk each cow once a day, and keep the herd fed with three bales.";
+      milkingCow = nearestCow;
+      milkingElapsed = 0;
+      nearestCow.userData.milking = true;
+      hero.rotation.y = Math.atan2(
+        nearestCow.position.x - hero.position.x,
+        nearestCow.position.z - hero.position.z,
+      );
+      milkBucket.visible = true;
+      milkStream.visible = true;
+      toast.textContent = "The farmer kneels down and starts milking the cow.";
       return;
     }
     if (fedBales >= 3) {
@@ -1516,6 +1562,13 @@ function updateCattle(dt: number, time: number) {
       z: number;
     }[];
     const legs = cow.userData.legs as { upper: THREE.Mesh; lower: THREE.Mesh }[];
+    if (cow.userData.milking) {
+      legs.forEach(({ upper, lower }) => {
+        upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 8);
+        lower.rotation.x = THREE.MathUtils.lerp(lower.rotation.x, 0, dt * 8);
+      });
+      return;
+    }
     cow.userData.stateTimer -= dt;
     const feedBale = cow.userData.feedBale as THREE.Mesh | undefined;
     if (feedBale) {
@@ -1624,13 +1677,45 @@ function loop() {
   }
   refreshDayTimer();
   updateCattle(dt, t);
+  if (milkingCow) {
+    milkingElapsed += dt;
+    hero.scale.y = 0.7;
+    coat.position.y = 0.62;
+    legs.forEach((leg, index) => {
+      leg.rotation.x = index === 0 ? -1.05 : 1.05;
+    });
+    arms.forEach((arm, index) => {
+      arm.rotation.x = index === 0 ? -1.3 + Math.sin(t * 12) * 0.16 : -0.85;
+      arm.rotation.z = index === 0 ? 0.45 : -0.45;
+    });
+    const udderPosition = milkingCow.localToWorld(
+      new THREE.Vector3(0, 0.29, -0.12),
+    );
+    milkStream.position.copy(udderPosition).add(new THREE.Vector3(0, -0.225, 0));
+    milkStream.visible = true;
+    if (milkingElapsed >= 2.4) {
+      milkingCow.userData.milking = false;
+      milkingCow.userData.milkedToday = true;
+      milkingCow = null;
+      milkStream.visible = false;
+      milkBucket.visible = false;
+      hero.scale.y = 1;
+      coat.position.y = 0.72;
+      milk++;
+      cattleCare = Math.min(100, cattleCare + 2);
+      refreshFarm();
+      toast.textContent = `Milk collected! You now have ${milk} pail${milk === 1 ? "" : "s"}.`;
+      questText.textContent =
+        "Milk each cow once a day, and keep the herd fed with three bales.";
+    }
+  }
   let dx = 0,
     dz = 0;
   if (keys.has("ArrowUp")) dz -= 1;
   if (keys.has("ArrowDown")) dz += 1;
   if (keys.has("ArrowLeft")) dx -= 1;
   if (keys.has("ArrowRight")) dx += 1;
-  if (dx || dz) {
+  if (!milkingCow && (dx || dz)) {
     const l = Math.hypot(dx, dz);
     dx /= l;
     dz /= l;
@@ -1645,7 +1730,7 @@ function loop() {
     arms.forEach((arm, index) => {
       arm.rotation.x = (index === 0 ? -1 : 1) * stride * 0.75;
     });
-  } else {
+  } else if (!milkingCow) {
     legs.forEach((leg) => (leg.rotation.x *= 0.75));
     arms.forEach((arm) => (arm.rotation.x *= 0.75));
   }
