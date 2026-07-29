@@ -1,325 +1,68 @@
 import './style.css'
 import * as THREE from 'three'
 
-type GameState = 'ready' | 'running' | 'gameover'
+const app = document.querySelector<HTMLDivElement>('#app')!
+app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Harvest wheat, then take care of the cattle.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="guide"><b>ARROWS</b> move / drive <b>DRAG</b> look around <b>SHIFT</b> sprint <b>SPACE</b> jump <b>E</b> interact / tractor <b>F</b> drop bale</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`
 
-class NeonRunner {
-  private readonly scene = new THREE.Scene()
-  private readonly camera: THREE.PerspectiveCamera
-  private readonly renderer: THREE.WebGLRenderer
-  private readonly clock = new THREE.Clock()
-
-  private readonly roadSegments: THREE.Mesh[] = []
-  private readonly obstacles: THREE.Object3D[] = []
-  private playerGroup!: THREE.Group
-  private readonly overlay: HTMLDivElement
-  private readonly overlayText: HTMLParagraphElement
-  private readonly scoreValue: HTMLSpanElement
-  private readonly startButton: HTMLButtonElement
-  private readonly hud: HTMLDivElement
-
-  private state: GameState = 'ready'
-  private score = 0
-  private spawnTimer = 0.8
-  private targetLane = 1
-  private jumpTime = 0
-  private jumpDuration = 0.6
-  private jumpRequested = false
-  private readonly pressedKeys = new Set<string>()
-
-  private readonly lanes = [3.4, 0, -3.4]
-  private readonly roadLength = 42
-  private readonly speed = 24
-
-  constructor() {
-    const app = document.querySelector<HTMLDivElement>('#app')!
-    app.innerHTML = ''
-
-    this.renderer = new THREE.WebGLRenderer({ antialias: true })
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.shadowMap.enabled = true
-    app.appendChild(this.renderer.domElement)
-
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200)
-    this.camera.position.set(0, 7.5, -10)
-
-    this.scene.background = new THREE.Color(0x020617)
-    this.scene.fog = new THREE.Fog(0x020617, 16, 90)
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.85)
-    const sun = new THREE.DirectionalLight(0x8b5cf6, 1.3)
-    sun.position.set(6, 12, 8)
-    sun.castShadow = true
-
-    this.scene.add(ambient, sun)
-
-    this.createRoad()
-    this.createPlayer()
-    this.createLights()
-
-    this.overlay = document.createElement('div')
-    this.overlay.className = 'overlay'
-    this.overlay.innerHTML = `
-      <div class="panel">
-        <h1>Neon Runner</h1>
-        <p>Dash through the city at full speed.</p>
-        <p id="overlayText">Use the arrow keys or A/D to switch lanes and Space to jump.</p>
-        <button id="startButton">Start Run</button>
-      </div>
-    `
-    app.appendChild(this.overlay)
-
-    this.overlayText = this.overlay.querySelector<HTMLParagraphElement>('#overlayText')!
-    this.startButton = this.overlay.querySelector<HTMLButtonElement>('#startButton')!
-    this.startButton.addEventListener('click', () => this.startGame())
-
-    this.hud = document.createElement('div')
-    this.hud.className = 'hud'
-    this.hud.innerHTML = '<div class="hud-card">Distance <span id="scoreValue">0</span></div>'
-    app.appendChild(this.hud)
-    this.scoreValue = this.hud.querySelector<HTMLSpanElement>('#scoreValue')!
-
-    this.bindInput()
-    window.addEventListener('resize', () => this.onResize())
-
-    window.setTimeout(() => {
-      if (this.state !== 'running') {
-        this.startGame()
-      }
-    }, 250)
-
-    this.animate()
-  }
-
-  private createRoad(): void {
-    const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9, metalness: 0.2 })
-    const lineMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x452100 })
-
-    for (let index = 0; index < 4; index += 1) {
-      const road = new THREE.Mesh(new THREE.BoxGeometry(12, 0.35, this.roadLength), roadMaterial)
-      road.position.set(0, 0, index * this.roadLength - this.roadLength * 1.5)
-      road.receiveShadow = true
-      this.scene.add(road)
-      this.roadSegments.push(road)
-
-      const line = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.36, this.roadLength), lineMaterial)
-      line.position.set(0, 0.2, road.position.z)
-      this.scene.add(line)
-    }
-
-    const sideLeft = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 200), new THREE.MeshStandardMaterial({ color: 0x0f172a }))
-    sideLeft.position.set(-6.5, 0.2, 0)
-    sideLeft.receiveShadow = true
-    this.scene.add(sideLeft)
-
-    const sideRight = sideLeft.clone() as THREE.Mesh
-    sideRight.position.set(6.5, 0.2, 0)
-    this.scene.add(sideRight)
-  }
-
-  private createPlayer(): void {
-    this.playerGroup = new THREE.Group()
-    this.playerGroup.position.set(0, 1.1, 0)
-
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(1.05, 1.05, 1.05),
-      new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0f172a, roughness: 0.2, metalness: 0.25 })
-    )
-    body.castShadow = true
-    body.receiveShadow = true
-
-    const visor = new THREE.Mesh(
-      new THREE.BoxGeometry(0.55, 0.28, 0.2),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x020617 })
-    )
-    visor.position.set(0, 0.15, 0.55)
-    visor.castShadow = true
-
-    this.playerGroup.add(body, visor)
-    this.scene.add(this.playerGroup)
-  }
-
-  private createLights(): void {
-    const glow = new THREE.PointLight(0x22d3ee, 22, 30, 2)
-    glow.position.set(0, 2.5, 1.2)
-    this.playerGroup.add(glow)
-  }
-
-  private bindInput(): void {
-    document.addEventListener('keydown', (event) => {
-      this.pressedKeys.add(event.code)
-
-      if (event.code === 'ArrowLeft' || event.code === 'KeyA') {
-        this.targetLane = Math.min(this.lanes.length - 1, this.targetLane + 1)
-        event.preventDefault()
-      }
-
-      if (event.code === 'ArrowRight' || event.code === 'KeyD') {
-        this.targetLane = Math.max(0, this.targetLane - 1)
-        event.preventDefault()
-      }
-
-      if (event.code === 'Space' || event.code === 'ArrowUp' || event.code === 'KeyW') {
-        this.jumpRequested = true
-        event.preventDefault()
-      }
-
-      if (event.code === 'Enter' && this.state !== 'running') {
-        this.startGame()
-      }
-    })
-
-    document.addEventListener('keyup', (event) => {
-      this.pressedKeys.delete(event.code)
-      if (event.code === 'ArrowLeft' || event.code === 'ArrowRight' || event.code === 'KeyA' || event.code === 'KeyD') {
-        event.preventDefault()
-      }
-    })
-  }
-
-  private onResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight
-    this.camera.updateProjectionMatrix()
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
-  }
-
-  private startGame(): void {
-    this.state = 'running'
-    this.score = 0
-    this.spawnTimer = 0.8
-    this.targetLane = 1
-    this.playerGroup.position.set(this.lanes[this.targetLane], 1.1, 0)
-    this.overlay.classList.add('hidden')
-    this.hud.classList.remove('hidden')
-    this.updateHud()
-    this.obstacles.splice(0)
-    this.scene.children.forEach((child: THREE.Object3D) => {
-      if (child.userData.obstacle) {
-        this.scene.remove(child)
-      }
-    })
-  }
-
-  private updateHud(): void {
-    this.scoreValue.textContent = Math.floor(this.score).toString()
-  }
-
-  private animate(): void {
-    const delta = this.clock.getDelta()
-    requestAnimationFrame(() => this.animate())
-
-    if (this.state === 'running') {
-      this.updateWorld(delta)
-    }
-
-    this.renderer.render(this.scene, this.camera)
-  }
-
-  private updateWorld(delta: number): void {
-    this.score += delta * 16
-    this.updateHud()
-
-    this.spawnTimer -= delta
-    if (this.spawnTimer <= 0) {
-      this.spawnObstacle()
-      this.spawnTimer = Math.max(0.45, 0.9 - this.score / 250)
-    }
-
-    this.roadSegments.forEach((segment) => {
-      segment.position.z -= this.speed * delta
-      if (segment.position.z < -this.roadLength * 1.5) {
-        segment.position.z += this.roadLength * 4
-      }
-    })
-
-    for (let index = this.obstacles.length - 1; index >= 0; index -= 1) {
-      const obstacle = this.obstacles[index]
-      obstacle.position.z -= this.speed * delta * 0.6
-      if (obstacle.position.z < -18) {
-        this.scene.remove(obstacle)
-        this.obstacles.splice(index, 1)
-      }
-    }
-
-    if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('KeyA')) {
-      this.targetLane = Math.min(this.lanes.length - 1, this.targetLane + 1)
-    }
-
-    if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('KeyD')) {
-      this.targetLane = Math.max(0, this.targetLane - 1)
-    }
-
-    this.playerGroup.position.x = THREE.MathUtils.lerp(this.playerGroup.position.x, this.lanes[this.targetLane], 0.22)
-    this.playerGroup.position.z += this.speed * delta * 0.18
-
-    if (this.jumpRequested && this.jumpTime <= 0) {
-      this.jumpTime = this.jumpDuration
-      this.jumpRequested = false
-    }
-
-    if (this.jumpTime > 0) {
-      this.jumpTime -= delta
-      const t = 1 - this.jumpTime / this.jumpDuration
-      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-      this.playerGroup.position.y = 1.1 + Math.sin(eased * Math.PI) * 1.8
-    } else {
-      this.playerGroup.position.y = 1.1
-    }
-
-    this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, this.playerGroup.position.x * 0.2, 0.06)
-    this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, this.playerGroup.position.z - 8.5, 0.06)
-    this.camera.lookAt(this.playerGroup.position.x * 0.25, 1.2, this.playerGroup.position.z + 2)
-
-    this.checkCollisions()
-  }
-
-  private spawnObstacle(): void {
-    const lane = Math.floor(Math.random() * this.lanes.length)
-    const obstacle = new THREE.Group()
-
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(1.2, 1.2, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0x3f0d1f, roughness: 0.25, metalness: 0.25 })
-    )
-    body.castShadow = true
-    body.receiveShadow = true
-
-    const cap = new THREE.Mesh(
-      new THREE.BoxGeometry(1.05, 0.3, 1.05),
-      new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0x4f2d09, roughness: 0.4, metalness: 0.2 })
-    )
-    cap.position.set(0, 0.75, 0)
-    cap.castShadow = true
-
-    const glow = new THREE.PointLight(0xff4d6d, 10, 6, 2)
-    glow.position.set(0, 0.6, 0)
-
-    obstacle.add(body, cap, glow)
-    obstacle.position.set(this.lanes[lane], 0.9, 20)
-    obstacle.userData.obstacle = true
-    obstacle.userData.lane = lane
-
-    this.scene.add(obstacle)
-    this.obstacles.push(obstacle)
-  }
-
-  private checkCollisions(): void {
-    const playerBox = new THREE.Box3().setFromObject(this.playerGroup)
-    for (const obstacle of this.obstacles) {
-      const obstacleBox = new THREE.Box3().setFromObject(obstacle)
-      const overlap = playerBox.intersectsBox(obstacleBox)
-      const jumping = this.jumpTime > 0
-      if (overlap && !jumping) {
-        this.state = 'gameover'
-        this.overlayText.textContent = 'You crashed. Press restart to try again.'
-        this.startButton.textContent = 'Restart Run'
-        this.overlay.classList.remove('hidden')
-        this.hud.classList.add('hidden')
-        break
-      }
-    }
-  }
-}
-
-new NeonRunner()
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x87c7db); scene.fog = new THREE.FogExp2(0x87c7db,.012)
+const camera = new THREE.PerspectiveCamera(57,innerWidth/innerHeight,.1,180); const renderer = new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;app.prepend(renderer.domElement)
+scene.add(new THREE.HemisphereLight(0xdaf2ff,0x355a55,2.2)); const sun=new THREE.DirectionalLight(0xffecae,3);sun.position.set(-18,30,10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun)
+const water=new THREE.Mesh(new THREE.PlaneGeometry(260,260),new THREE.MeshStandardMaterial({color:0x65aebd,roughness:.35,metalness:.18}));water.rotation.x=-Math.PI/2;water.position.y=-3;scene.add(water)
+const ground=new THREE.Group();scene.add(ground);const heights=new Map<string,number>(),cellSize=2.4
+const grassMats=[0x5c9858,0x70a85d,0x4c8758].map(c=>new THREE.MeshStandardMaterial({color:c,flatShading:true})),dirt=new THREE.MeshStandardMaterial({color:0x826440,flatShading:true}),snow=new THREE.MeshStandardMaterial({color:0xdbe7e2,flatShading:true})
+function noise(x:number,z:number){return Math.sin(x*.19)*1.2+Math.cos(z*.16)*1.15+Math.sin((x+z)*.08)*1.6+Math.cos(Math.sqrt(x*x+z*z)*.12)*.8}
+function hAt(x:number,z:number){return heights.get(`${x},${z}`)??0}
+for(let x=-23;x<=23;x++)for(let z=-23;z<=23;z++){const edge=Math.max(Math.abs(x),Math.abs(z));const inForest=x<-6&&z>1;let h=0;if(inForest)h=Math.max(0,Math.round((noise(x,z)*.75+.8)*2)/2);if(edge>18)h=Math.max(h,Math.round((2.5+(edge-18)*.9+Math.abs(noise(x,z))*.7)*2)/2);heights.set(`${x},${z}`,h);const mat=h>3.5?snow:grassMats[Math.abs((x*3+z)%3)];const block=new THREE.Mesh(new THREE.BoxGeometry(cellSize,Math.max(.35,h+2.5),cellSize),mat);block.position.set(x*cellSize,(h-2.5)/2,z*cellSize);block.castShadow=true;block.receiveShadow=true;ground.add(block);if(h>.8){const side=new THREE.Mesh(new THREE.BoxGeometry(cellSize+.02,Math.max(.1,h+2.25),cellSize+.02),dirt);side.position.set(x*cellSize,(h-2.5)/2-.08,z*cellSize);ground.add(side)}}
+function yWorld(x:number,z:number){return hAt(Math.round(x/cellSize),Math.round(z/cellSize))+.12}
+const trunk=new THREE.MeshStandardMaterial({color:0x68482d}), leaf=new THREE.MeshStandardMaterial({color:0x246946,flatShading:true}), rockM=new THREE.MeshStandardMaterial({color:0x6f7d7c,flatShading:true})
+function tree(x:number,z:number,scale=1){const y=yWorld(x,z);const g=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(.15*scale,.22*scale,1.7*scale,6),trunk);t.position.y=.85*scale;const c=new THREE.Mesh(new THREE.ConeGeometry(.9*scale,2.4*scale,7),leaf);c.position.y=2*scale;g.add(t,c);g.position.set(x,y,z);g.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(g)}
+function rock(x:number,z:number){const r=new THREE.Mesh(new THREE.DodecahedronGeometry(.45,0),rockM);r.position.set(x,yWorld(x,z)+.25,z);r.scale.set(1.4,.75,1);r.castShadow=true;scene.add(r)}
+for(let i=0;i<180;i++){const x=(Math.random()-.5)*96,z=(Math.random()-.5)*96;const insideField=x>-40&&x<-2&&z>-40&&z<-2;if(Math.hypot(x,z)<10||Math.abs(x-27)<8&&Math.abs(z+22)<9||insideField)continue;if(Math.random()>.34)tree(x,z,.65+Math.random()*.7);else rock(x,z)}
+const shards:THREE.Group[]=[]
+// Farm landmarks: barn, fields, fences and a windmill
+const farmWood=new THREE.MeshStandardMaterial({color:0x7b4930}), barnRed=new THREE.MeshStandardMaterial({color:0xad4e35}), hay=new THREE.MeshStandardMaterial({color:0xd8b34a}), fence=new THREE.MeshStandardMaterial({color:0x815b36})
+function addBox(mat:THREE.Material,x:number,y:number,z:number,w:number,h:number,d:number){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);b.position.set(x,y,z);b.castShadow=true;b.receiveShadow=true;scene.add(b);return b}
+function barn(x:number,z:number){const y=yWorld(x,z);addBox(barnRed,x,y+1.5,z,6,3,4.5);const roof=new THREE.Mesh(new THREE.ConeGeometry(3.7,2.2,4),farmWood);roof.position.set(x,y+4,z);roof.rotation.y=Math.PI/4;roof.castShadow=true;scene.add(roof);addBox(new THREE.MeshStandardMaterial({color:0x4e2c22}),x,y+.8,z-2.28,1.25,1.6,.05)}
+function farmhouse(x:number,z:number){const y=yWorld(x,z);const wall=new THREE.MeshStandardMaterial({color:0xe8ddbd});addBox(wall,x,y+1.3,z,4.6,2.6,3.8);const top=new THREE.Mesh(new THREE.ConeGeometry(3.05,1.75,4),new THREE.MeshStandardMaterial({color:0x66513e}));top.position.set(x,y+3.45,z);top.rotation.y=Math.PI/4;top.castShadow=true;scene.add(top);addBox(farmWood,x,y+.75,z-1.92,.9,1.5,.07)}
+function fenceLine(x:number,z:number,length:number,vertical:boolean){for(let i=0;i<length;i++){const px=x+(vertical?0:i*.9),pz=z+(vertical?i*.9:0),y=yWorld(px,pz);addBox(fence,px,y+.42,pz,vertical?.08:.9,.08,vertical?.9:.08);addBox(fence,px,y+.38,pz,.1,.75,.1)}}
+barn(4,-5);farmhouse(10,-5)
+// Two farm vehicles: a green baler tractor and an orange wheat-cutting combine.
+const tractor=new THREE.Group(),tractorGreen=new THREE.MeshStandardMaterial({color:0x2f7351,roughness:.65}),tractorYellow=new THREE.MeshStandardMaterial({color:0xe0b642}),tire=new THREE.MeshStandardMaterial({color:0x202522});const tractorBody=new THREE.Mesh(new THREE.BoxGeometry(1.45,.55,2),tractorGreen);tractorBody.position.y=.62;tractor.add(tractorBody);const hood=new THREE.Mesh(new THREE.BoxGeometry(1.22,.48,.9),tractorGreen);hood.position.set(0,.82,-.55);tractor.add(hood);const seat=new THREE.Mesh(new THREE.BoxGeometry(.7,.65,.6),tractorYellow);seat.position.set(0,1.05,.52);tractor.add(seat);for(const [x,z,r] of [[-.78,-.62,.38],[.78,-.62,.38],[-.86,.7,.56],[.86,.7,.56]] as number[][]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(r,r,.25,10),tire);wheel.rotation.z=Math.PI/2;wheel.position.set(x,r,z);wheel.castShadow=true;tractor.add(wheel)}tractor.position.set(1.6,yWorld(1.6,-5)+.05,-5);tractor.rotation.y=Math.PI/2;tractor.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(tractor)
+const harvester=new THREE.Group(),orange=new THREE.MeshStandardMaterial({color:0xd66a28,roughness:.6}),darkOrange=new THREE.MeshStandardMaterial({color:0xa8471f});const combineBody=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.1,2.45),orange);combineBody.position.y=1;harvester.add(combineBody);const cab=new THREE.Mesh(new THREE.BoxGeometry(1.1,.85,.8),new THREE.MeshStandardMaterial({color:0x8fc1c0,metalness:.2}));cab.position.set(0,1.65,.4);harvester.add(cab);const cutter=new THREE.Mesh(new THREE.BoxGeometry(2.8,.2,.45),darkOrange);cutter.position.set(0,.48,-1.45);harvester.add(cutter);for(const [x,z,r] of [[-.98,-.55,.42],[.98,-.55,.42],[-1,.72,.63],[1,.72,.63]] as number[][]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(r,r,.27,10),tire);wheel.rotation.z=Math.PI/2;wheel.position.set(x,r,z);harvester.add(wheel)}harvester.position.set(-1.3,yWorld(-1.3,-5)+.05,-5);harvester.rotation.y=Math.PI/2;harvester.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(harvester)
+const planter=new THREE.Group(),purple=new THREE.MeshStandardMaterial({color:0x7548a3,roughness:.6});const planterBody=new THREE.Mesh(new THREE.BoxGeometry(1.5,.62,2),purple);planterBody.position.y=.7;planter.add(planterBody);const planterCab=new THREE.Mesh(new THREE.BoxGeometry(.75,.7,.68),new THREE.MeshStandardMaterial({color:0xa9c5c1}));planterCab.position.set(0,1.25,.42);planter.add(planterCab);const seeder=new THREE.Mesh(new THREE.BoxGeometry(2.5,.25,.38),new THREE.MeshStandardMaterial({color:0x513276}));seeder.position.set(0,.42,-1.18);planter.add(seeder);for(const [x,z,r] of [[-.75,-.58,.37],[.75,-.58,.37],[-.82,.65,.5],[.82,.65,.5]] as number[][]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(r,r,.24,10),tire);wheel.rotation.z=Math.PI/2;wheel.position.set(x,r,z);planter.add(wheel)}planter.position.set(-4.1,yWorld(-4.1,-5)+.05,-5);planter.rotation.y=Math.PI/2;planter.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(planter)
+const loader=new THREE.Group(),loaderBlue=new THREE.MeshStandardMaterial({color:0x32739a,roughness:.55});const loaderBody=new THREE.Mesh(new THREE.BoxGeometry(1.5,.7,1.9),loaderBlue);loaderBody.position.y=.75;loader.add(loaderBody);const loaderCab=new THREE.Mesh(new THREE.BoxGeometry(.75,.8,.7),new THREE.MeshStandardMaterial({color:0x9dced1}));loaderCab.position.set(0,1.32,.35);loader.add(loaderCab);const forks=new THREE.Mesh(new THREE.BoxGeometry(1.25,.1,1.1),new THREE.MeshStandardMaterial({color:0x555a58}));forks.position.set(0,.42,-1.35);loader.add(forks);for(const [x,z,r] of [[-.75,-.55,.36],[.75,-.55,.36],[-.8,.62,.5],[.8,.62,.5]] as number[][]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(r,r,.24,10),tire);wheel.rotation.z=Math.PI/2;wheel.position.set(x,r,z);loader.add(wheel)}loader.position.set(-6.7,yWorld(-6.7,-5)+.05,-5);loader.rotation.y=Math.PI/2;loader.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(loader)
+const baleStack=new THREE.Group();baleStack.position.set(1.5,yWorld(1.5,-7)+.05,-7);scene.add(baleStack)
+// The southwest quarter is dedicated to one large working field.
+const soil=new THREE.MeshStandardMaterial({color:0x704a2d,roughness:1}), darkSoil=new THREE.MeshStandardMaterial({color:0x4d301f,roughness:1}), waterMat=new THREE.MeshStandardMaterial({color:0x4b9fbb,roughness:.35,metalness:.1})
+const fieldX=-21,fieldZ=-21,fieldW=36,fieldD=36,fieldY=yWorld(fieldX,fieldZ),wheatPlants:THREE.Mesh[]=[];addBox(soil,fieldX,fieldY+.035,fieldZ,fieldW,.09,fieldD)
+for(let row=-fieldD/2+.65;row<fieldD/2;row+=.8){addBox(darkSoil,fieldX,fieldY+.095,fieldZ+row,fieldW-.5,.06,.15);for(let col=-fieldW/2+.75;col<fieldW/2;col+=1.6){const plant=new THREE.Mesh(new THREE.ConeGeometry(.1,.72,5),hay);plant.position.set(fieldX+col+(Math.random()-.5)*.12,fieldY+.43,fieldZ+row);plant.rotation.z=(Math.random()-.5)*.18;plant.rotation.y=Math.random()*Math.PI;plant.userData.baseY=fieldY+.43;plant.userData.row=row;plant.castShadow=true;scene.add(plant);wheatPlants.push(plant)}}
+// Irrigation splits the huge field into manageable plots.
+addBox(waterMat,fieldX,fieldY+.05,fieldZ,.32,.05,fieldD-.6);addBox(waterMat,fieldX,fieldY+.05,fieldZ+9,fieldW-.6,.05,.28)
+fenceLine(fieldX-fieldW/2,fieldZ-fieldD/2,41,false);fenceLine(fieldX-fieldW/2,fieldZ-fieldD/2,41,true);fenceLine(fieldX+fieldW/2,fieldZ-fieldD/2,41,true);fenceLine(fieldX-fieldW/2,fieldZ+fieldD/2,41,false)
+// Hay bales mark the field edge.
+for(const [x,z] of [[-38,-38],[-37.3,-38],[-4,-38]]){const bale=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.65,10),hay);bale.rotation.z=Math.PI/2;bale.position.set(x,yWorld(x,z)+.35,z);bale.castShadow=true;scene.add(bale)}
+// Pasture: a distinct grass pen with grazing cattle.
+fenceLine(5,3,12,false);fenceLine(5,3,10,true);fenceLine(14.9,3,10,true);fenceLine(5,11.1,12,false)
+for(const [x,z] of [[7,5],[10,7],[13,5.5],[8,9.5]]){const cow=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(.9,.5,.5),new THREE.MeshStandardMaterial({color:0xf5f0df}));const head=new THREE.Mesh(new THREE.BoxGeometry(.32,.32,.32),new THREE.MeshStandardMaterial({color:0xf5f0df}));head.position.set(0,.05,.52);cow.add(body,head);cow.position.set(x,yWorld(x,z)+.42,z);cow.rotation.y=Math.random()*Math.PI;cow.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(cow)}
+// Dense woodland occupies the west of the valley.
+for(let x=-27;x<=-14;x+=1.5)for(let z=6;z<=20;z+=1.6){if(Math.random()>.22)tree(x+(Math.random()-.5)*.5,z+(Math.random()-.5)*.5,.85+Math.random()*.65)}
+// A mountain wall frames the playable map on every side.
+const mountainMat=new THREE.MeshStandardMaterial({color:0x586866,flatShading:true});for(let i=-55;i<=55;i+=6){for(const [x,z] of [[i,-55],[i,55],[-55,i],[55,i]]){const peak=new THREE.Mesh(new THREE.ConeGeometry(3.8+Math.random()*2,8+Math.random()*6,7),mountainMat);peak.position.set(x,-.4,z);peak.rotation.y=Math.random();peak.castShadow=true;scene.add(peak)}}
+const beacon=new THREE.Group();const millBase=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.8,5,8),new THREE.MeshStandardMaterial({color:0xe6dfc8}));millBase.position.y=2.5;beacon.add(millBase);const roof=new THREE.Mesh(new THREE.ConeGeometry(1.95,1.7,8),farmWood);roof.position.y=5.8;beacon.add(roof);const sails=new THREE.Group();for(let i=0;i<4;i++){const blade=new THREE.Mesh(new THREE.BoxGeometry(.55,3.4,.1),new THREE.MeshStandardMaterial({color:0xe9dbc0}));blade.position.y=1.55;blade.rotation.z=i*Math.PI/2;sails.add(blade)}sails.position.set(0,5.1,-1.55);beacon.add(sails);beacon.userData.sails=sails;beacon.position.set(27,yWorld(27,-22),-22);scene.add(beacon)
+function creature(x:number,z:number,color:number){const g=new THREE.Group(),body=new THREE.Mesh(new THREE.SphereGeometry(.52,10,8),new THREE.MeshStandardMaterial({color})),head=new THREE.Mesh(new THREE.SphereGeometry(.32,9,8),new THREE.MeshStandardMaterial({color}));head.position.set(0,.16,.48);g.add(body,head);g.position.set(x,yWorld(x,z)+.5,z);g.userData.origin=g.position.clone();scene.add(g);return g}const creatures=[creature(-15,10,0xd6ac7c),creature(-12,13,0xd6ac7c),creature(14,9,0x899e76)]
+const hero=new THREE.Group();const coat=new THREE.Mesh(new THREE.CapsuleGeometry(.25,.65,5,8),new THREE.MeshStandardMaterial({color:0x456f99}));coat.position.y=.7;const head=new THREE.Mesh(new THREE.SphereGeometry(.22,9,8),new THREE.MeshStandardMaterial({color:0xf0bd91}));head.position.y=1.25;const pack=new THREE.Mesh(new THREE.BoxGeometry(.42,.55,.2),new THREE.MeshStandardMaterial({color:0x8a593a}));pack.position.set(0,.78,.22);hero.add(coat,head,pack);hero.position.set(0,yWorld(0,0),0);hero.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true});scene.add(hero)
+const keys=new Set<string>();let vy=0,shardCount=1,interacted=false,orbitYaw=.55,orbitPitch=.55,dragging=false,lastX=0,lastY=0,lastRightClick=0,wheat=0,cattleCare=50,ripePlots=45,farmDay=1,cropMaturity=1,driving=false,usingHarvester=false,usingPlanter=false,usingLoader=false,lastCut=0,looseStraw=0,bales=0,storedBales=0;let carriedBale:THREE.Mesh|null=null;const baleObjects:THREE.Mesh[]=[],lastCutPosition=new THREE.Vector3(999,999,999),lastPlantPosition=new THREE.Vector3(999,999,999),fallenWheat:{mesh:THREE.Group;velocity:THREE.Vector3;settled:boolean}[]=[];const toast=document.querySelector('#toast')!,questText=document.querySelector('#questText')!,shardLabel=document.querySelector('#shards')!,location=document.querySelector('#location')!,wheatLabel=document.querySelector('#wheat')!,careLabel=document.querySelector('#care')!,plotsLabel=document.querySelector('#plots')!,balesLabel=document.querySelector('#bales')!,storedLabel=document.querySelector('#stored')!
+function refreshFarm(){wheatLabel.textContent=String(wheat);careLabel.textContent=`${cattleCare}%`;plotsLabel.textContent=String(ripePlots);balesLabel.textContent=String(bales);storedLabel.textContent=String(storedBales);shardLabel.textContent=String(shardCount)}
+function dropCarriedBale(){if(!driving||!usingLoader||!carriedBale){toast.textContent='Use the blue loader to pick up a bale first.';return}const bale=carriedBale,drop=loader.localToWorld(new THREE.Vector3(0,.45,-1.5)),nearby=baleObjects.filter(other=>other.position.distanceTo(drop)<1.5);loader.remove(bale);scene.add(bale);const base=nearby.length?Math.max(...nearby.map(other=>other.position.y))+.7:yWorld(drop.x,drop.z)+.35;bale.position.set(drop.x,base,drop.z);bale.rotation.set(0,Math.random()*Math.PI,Math.PI/2);baleObjects.push(bale);bales++;if(nearby.length){storedBales++;toast.textContent='You stacked the bale where you chose.'}else toast.textContent='You set the bale down where you chose.';carriedBale=null;refreshFarm()}
+function dropHarvest(){for(let i=0;i<3;i++){const sheaf=new THREE.Group();for(let stalk=0;stalk<6;stalk++){const stem=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.55,5),hay);stem.position.set((Math.random()-.5)*.24,.28,(Math.random()-.5)*.24);stem.rotation.z=(Math.random()-.5)*.45;sheaf.add(stem)}sheaf.position.copy(hero.position).add(new THREE.Vector3((Math.random()-.5)*.4,1.2+i*.2,(Math.random()-.5)*.4));scene.add(sheaf);fallenWheat.push({mesh:sheaf,velocity:new THREE.Vector3((Math.random()-.5)*1.1,.5+i*.15,(Math.random()-.5)*1.1),settled:false})}}
+const cutWheatMat=new THREE.MeshStandardMaterial({color:0xe5bd4c,roughness:.85});function dropCutStalks(){const forward=new THREE.Vector3(0,0,-1).applyQuaternion(harvester.quaternion);for(let i=0;i<1;i++){const clump=new THREE.Group();for(let stalk=0;stalk<4;stalk++){const stem=new THREE.Mesh(new THREE.CylinderGeometry(.02,.028,.62,5),cutWheatMat);stem.position.set((Math.random()-.5)*.18,.3,(Math.random()-.5)*.16);stem.rotation.z=(Math.random()-.5)*.6;clump.add(stem)}const spread=new THREE.Vector3((Math.random()-.5)*.8,0,(Math.random()-.5)*.25);clump.position.copy(harvester.position).addScaledVector(forward,1.45).add(spread);clump.position.y+=.8+Math.random()*.2;scene.add(clump);fallenWheat.push({mesh:clump,velocity:forward.clone().multiplyScalar(1+Math.random()).add(new THREE.Vector3((Math.random()-.5),1.2+Math.random(),(Math.random()-.5))),settled:false})}}
+function cutRowWithCombine(){if(harvester.position.distanceTo(lastCutPosition)<.3)return false;const forward=new THREE.Vector3(0,0,-1).applyQuaternion(harvester.quaternion),right=new THREE.Vector3(1,0,0).applyQuaternion(harvester.quaternion);const cut=wheatPlants.filter(plant=>{if(!plant.visible)return false;const offset=plant.position.clone().sub(harvester.position);return offset.dot(forward)>-.3&&offset.dot(forward)<1.65&&Math.abs(offset.dot(right))<1.45});if(cut.length===0)return false;lastCutPosition.copy(harvester.position);cut.forEach(plant=>plant.visible=false);ripePlots=Math.max(0,ripePlots-cut.length);wheat+=cut.length;for(let i=0;i<Math.ceil(cut.length/8);i++)dropCutStalks();refreshFarm();toast.textContent=`Combine cut ${cut.length} stalks under the cutter.`;return true}
+function plantWheatWithTractor(){if(wheat<1||planter.position.distanceTo(lastPlantPosition)<.3)return false;const forward=new THREE.Vector3(0,0,-1).applyQuaternion(planter.quaternion),right=new THREE.Vector3(1,0,0).applyQuaternion(planter.quaternion);const seeds=wheatPlants.filter(plant=>{if(plant.visible)return false;const offset=plant.position.clone().sub(planter.position);return offset.dot(forward)>-.3&&offset.dot(forward)<1.55&&Math.abs(offset.dot(right))<1.35});if(seeds.length===0)return false;lastPlantPosition.copy(planter.position);seeds.forEach(plant=>{plant.visible=true;plant.userData.maturity=.08;plant.material=new THREE.MeshStandardMaterial({color:0x4f913f,roughness:.9})});wheat--;ripePlots+=seeds.length;refreshFarm();toast.textContent=`Purple planter sowed ${seeds.length} green wheat sprouts.`;return true}
+function farmAction(){const inField=hero.position.x>-40&&hero.position.x<-3&&hero.position.z>-40&&hero.position.z<-3;const inPasture=hero.position.x>4&&hero.position.x<16&&hero.position.z>2&&hero.position.z<13;if(inField){if(ripePlots===0){toast.textContent='These plots need another day to grow.';return}ripePlots--;cropMaturity=Math.max(.16,cropMaturity-.075);wheat+=2;shardCount++;dropHarvest();refreshFarm();toast.textContent='Harvested wheat dropped at your feet.';questText.textContent='The field is producing. Feed the cattle in the pasture.';return}if(inPasture){if(wheat===0){toast.textContent='The cattle need wheat. Harvest the fields first.';return}wheat--;cattleCare=Math.min(100,cattleCare+18);refreshFarm();toast.textContent='The cattle are well fed and content.';if(cattleCare>=80)questText.textContent='The herd is thriving. Your farm is off to a fine start.';return}toast.textContent='There is nothing to tend here. Visit the field or pasture.'}
+addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='Space'&&!driving&&hero.position.y<=yWorld(hero.position.x,hero.position.z)+.14)vy=6.2;if(e.code==='KeyF')dropCarriedBale();if(e.code==='KeyE'){if(driving){const vehicle=usingLoader?loader:usingPlanter?planter:usingHarvester?harvester:tractor;driving=false;hero.visible=true;hero.position.copy(vehicle.position).add(new THREE.Vector3(1,0,0));toast.textContent='You climb down from the vehicle.'}else if(hero.position.distanceTo(tractor.position)<2.5){driving=true;usingHarvester=false;usingPlanter=false;usingLoader=false;hero.visible=false;hero.position.copy(tractor.position);toast.textContent='Green tractor started. Drive over sheaves to collect and bale them.'}else if(hero.position.distanceTo(harvester.position)<2.8){driving=true;usingHarvester=true;usingPlanter=false;usingLoader=false;hero.visible=false;hero.position.copy(harvester.position);toast.textContent='Orange combine started. Drive through ripe wheat to cut it down.'}else if(hero.position.distanceTo(planter.position)<2.8){driving=true;usingHarvester=false;usingPlanter=true;usingLoader=false;hero.visible=false;hero.position.copy(planter.position);toast.textContent='Purple planter started. Drive over bare dirt to sow wheat.'}else if(hero.position.distanceTo(loader.position)<2.8){driving=true;usingHarvester=false;usingPlanter=false;usingLoader=true;hero.visible=false;hero.position.copy(loader.position);toast.textContent='Blue bale loader started. Drive over a bale to lift it, then press F to drop it.'}else if(hero.position.distanceTo(beacon.position)<4){interacted=true;questText.textContent='The mill is turning. Bring wheat from the field to the cattle.';toast.textContent='The windmill hums to life!'}else farmAction()}});addEventListener('keyup',e=>keys.delete(e.code));document.querySelector('#dropBale')!.addEventListener('click',dropCarriedBale)
+document.querySelector('#sleep')!.addEventListener('click',()=>{farmDay++;ripePlots=Math.min(18,ripePlots+6);cropMaturity=Math.min(1,cropMaturity+.35);cattleCare=Math.max(0,cattleCare-8);refreshFarm();toast.textContent=`Day ${farmDay}: the wheat has grown, and the cattle need attention.`;if(cattleCare<35)questText.textContent='The cattle are unhappy. Feed them wheat soon.'})
+refreshFarm()
+const youngWheatColor=new THREE.Color(0x4f913f),ripeWheatColor=new THREE.Color(0xd8b34a);function tintPlantedWheat(){wheatPlants.forEach(plant=>{if(!plant.visible||plant.userData.maturity===undefined)return;(plant.material as THREE.MeshStandardMaterial).color.lerpColors(youngWheatColor,ripeWheatColor,plant.userData.maturity)});requestAnimationFrame(tintPlantedWheat)}requestAnimationFrame(tintPlantedWheat)
+let lastGrowthTime=performance.now();function growWheat(now:number){const delta=Math.min(.05,(now-lastGrowthTime)/1000);lastGrowthTime=now;cropMaturity=Math.min(1,cropMaturity+delta*.006);wheatPlants.forEach((plant,index)=>{if(!plant.visible)return;const maturity=plant.userData.maturity===undefined?cropMaturity:plant.userData.maturity=Math.min(1,plant.userData.maturity+delta*.006);const height=.2+maturity*.8;plant.scale.y=height;plant.position.y=plant.userData.baseY-(1-height)*.28;plant.rotation.z=Math.sin(now*.0016+index)*.055});hay.color.setHex(cropMaturity>.75?0xd8b34a:cropMaturity>.4?0x9cb34b:0x557f45);fallenWheat.forEach(drop=>{if(drop.settled)return;drop.velocity.y-=9.8*delta;drop.mesh.position.addScaledVector(drop.velocity,delta);const floor=yWorld(drop.mesh.position.x,drop.mesh.position.z)+.12;if(drop.mesh.position.y<=floor){drop.mesh.position.y=floor;drop.velocity.set(0,0,0);drop.mesh.rotation.set(Math.PI/2,Math.random()*Math.PI,0);drop.settled=true}});if(driving){const vehicle=usingLoader?loader:usingPlanter?planter:usingHarvester?harvester:tractor;vehicle.position.copy(hero.position);vehicle.position.y=yWorld(hero.position.x,hero.position.z)+.05;vehicle.rotation.y=hero.rotation.y;if(usingHarvester){const inField=hero.position.x>-40&&hero.position.x<-3&&hero.position.z>-40&&hero.position.z<-3;if(inField&&now-lastCut>250){lastCut=now;cutRowWithCombine()}}else if(usingPlanter){plantWheatWithTractor()}else if(usingLoader){if(!carriedBale){for(let i=baleObjects.length-1;i>=0;i--){const bale=baleObjects[i];if(loader.position.distanceTo(bale.position)<1.7){loader.add(bale);bale.position.set(0,.5,-1.32);bale.rotation.set(0,0,Math.PI/2);baleObjects.splice(i,1);bales=Math.max(0,bales-1);carriedBale=bale;refreshFarm();toast.textContent='Bale lifted onto the loader forks. Press F to place it.';break}}}}else{for(let i=fallenWheat.length-1;i>=0;i--){const drop=fallenWheat[i];if(tractor.position.distanceTo(drop.mesh.position)<1.4){scene.remove(drop.mesh);fallenWheat.splice(i,1);looseStraw++;toast.textContent=`Tractor collected wheat (${looseStraw}/3).`;if(looseStraw>=3){looseStraw=0;bales++;const bale=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.72,10),hay);bale.rotation.z=Math.PI/2;bale.position.copy(tractor.position).add(new THREE.Vector3(-.8,.38,.55));bale.castShadow=true;scene.add(bale);baleObjects.push(bale);refreshFarm();toast.textContent=`A fresh wheat bale is made! Total bales: ${bales}.`}}}}}requestAnimationFrame(growWheat)}requestAnimationFrame(growWheat)
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;orbitYaw-=(e.clientX-lastX)*.008;orbitPitch=Math.max(.22,Math.min(1.15,orbitPitch-(e.clientY-lastY)*.006));lastX=e.clientX;lastY=e.clientY});renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture(e.pointerId);if(e.button===2){const now=performance.now();if(now-lastRightClick<420){camera.userData.distance=16;toast.textContent='Wide view enabled.';lastRightClick=0}else lastRightClick=now}});renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());renderer.domElement.addEventListener('wheel',e=>{camera.userData.distance=Math.max(5,Math.min(16,(camera.userData.distance??10)+e.deltaY*.009))},{passive:true})
+const clock=new THREE.Clock();function loop(){const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;const speed=keys.has('ShiftLeft')?10:5;let dx=0,dz=0;if(keys.has('ArrowUp'))dz-=1;if(keys.has('ArrowDown'))dz+=1;if(keys.has('ArrowLeft'))dx-=1;if(keys.has('ArrowRight'))dx+=1;if(dx||dz){const l=Math.hypot(dx,dz);dx/=l;dz/=l;hero.position.x+=dx*speed*dt;hero.position.z+=dz*speed*dt;hero.rotation.y=Math.atan2(dx,dz);coat.position.y=.7+Math.sin(t*15)*.05}hero.position.x=Math.max(-51,Math.min(51,hero.position.x));hero.position.z=Math.max(-51,Math.min(51,hero.position.z));vy-=15*dt;hero.position.y+=vy*dt;const floor=yWorld(hero.position.x,hero.position.z);if(hero.position.y<floor){hero.position.y=floor;vy=0}(beacon.userData.sails as THREE.Group).rotation.z=t*.8;shards.forEach(s=>{s.rotation.y+=dt*1.5;s.position.y=yWorld(s.position.x,s.position.z)+.72+Math.sin(t*2+s.position.x)*.12;if(!s.userData.collected&&hero.position.distanceTo(s.position)<1.25){s.userData.collected=true;s.visible=false;shardCount++;shardLabel.textContent=String(shardCount);toast.textContent=`Fresh crop collected! ${shardCount} of 12.`;if(interacted&&shardCount>=3)questText.textContent='The market basket is ready. Enjoy the open farm.'}});creatures.forEach((c,i)=>{const o=c.userData.origin as THREE.Vector3;c.position.x=o.x+Math.sin(t*.5+i)*1.2;c.position.z=o.z+Math.cos(t*.45+i)*.8;c.position.y=yWorld(c.position.x,c.position.z)+.5;c.rotation.y=t*.5+i});const d=hero.position.distanceTo(beacon.position);location.textContent=d<12?'WINDMILL HILL':hero.position.x<-13?'WESTWOOD':hero.position.x>4&&hero.position.z>2?'CATTLE PASTURE':hero.position.z<-1&&hero.position.x<-1?'WHEAT FIELDS':Math.abs(hero.position.x)>38||Math.abs(hero.position.z)>38?'MOUNTAIN BORDER':'HOMESTEAD';const distance=camera.userData.distance??10;const target=hero.position.clone().add(new THREE.Vector3(Math.sin(orbitYaw)*Math.cos(orbitPitch)*distance,Math.sin(orbitPitch)*distance,Math.cos(orbitYaw)*Math.cos(orbitPitch)*distance));camera.position.lerp(target,.14);camera.lookAt(hero.position.x,hero.position.y+.8,hero.position.z);renderer.render(scene,camera);requestAnimationFrame(loop)}loop();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
