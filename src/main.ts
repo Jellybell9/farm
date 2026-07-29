@@ -162,6 +162,8 @@ for (let i = 0; i < 180; i++) {
   else rock(x, z);
 }
 const shards: THREE.Group[] = [];
+let refrigerator: THREE.Group | null = null;
+let refrigeratorDoor: THREE.Group | null = null;
 // Farm landmarks: barn, fields, fences and a windmill
 const farmWood = new THREE.MeshStandardMaterial({ color: 0x7b4930 }),
   barnRed = new THREE.MeshStandardMaterial({ color: 0xad4e35 }),
@@ -252,7 +254,29 @@ function farmhouse(x: number, z: number) {
   sink.position.set(x + 2.05, y + 1.22, z + 2.55);
   sink.rotation.x = Math.PI / 2;
   scene.add(sink);
-  addBox(cabinet, x + 3.55, y + 1.9, z + 2.81, 0.62, 1.55, 0.16);
+  refrigerator = new THREE.Group();
+  refrigerator.position.set(x + 3.35, y + 1.18, z + 1.48);
+  const fridgeBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.88, 2.2, 0.78),
+    new THREE.MeshStandardMaterial({ color: 0xe4ebe4, metalness: 0.15, roughness: 0.38 }),
+  );
+  fridgeBody.position.y = 1.1;
+  refrigerator.add(fridgeBody);
+  refrigeratorDoor = new THREE.Group();
+  refrigeratorDoor.position.set(-0.4, 1.12, -0.42);
+  const fridgeFront = new THREE.Mesh(
+    new THREE.BoxGeometry(0.82, 2.04, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xf4f5ed, metalness: 0.12, roughness: 0.32 }),
+  );
+  fridgeFront.position.x = 0.41;
+  const fridgeHandle = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.75, 0.07), charcoal);
+  fridgeHandle.position.set(0.7, 0, -0.06);
+  refrigeratorDoor.add(fridgeFront, fridgeHandle);
+  refrigerator.add(refrigeratorDoor);
+  refrigerator.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.castShadow = true;
+  });
+  scene.add(refrigerator);
 
   // Living room spans the open front, oriented toward the fireplace on the back wall.
   addBox(sofa, x, y + 0.55, z - 1.45, 2.35, 0.7, 0.72);
@@ -930,6 +954,7 @@ let vy = 0,
   lastRightClick = 0,
   wheat = 0,
   milk = 0,
+  chilledMilk = 0,
   cattleCare = 50,
   ripePlots = 45,
   farmDay = 1,
@@ -975,7 +1000,7 @@ const toast = document.querySelector("#toast")!,
   milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
-  milkLabel.textContent = String(milk);
+  milkLabel.textContent = `${milk} carried / ${chilledMilk} chilled`;
   careLabel.textContent = `${cattleCare}%`;
   plotsLabel.textContent = String(ripePlots);
   balesLabel.textContent = String(bales);
@@ -1249,6 +1274,28 @@ function plantWheatWithTractor() {
   toast.textContent = `Purple planter sowed ${seeds.length} green wheat sprouts.`;
   return true;
 }
+let fridgeOpen = false;
+function interactWithFridge() {
+  if (!refrigerator || hero.position.distanceTo(refrigerator.position) > 2) return false;
+  if (!fridgeOpen) {
+    fridgeOpen = true;
+    toast.textContent = milk > 0
+      ? "The refrigerator is open. Press E again to put milk inside."
+      : "The refrigerator is open. Bring back fresh milk to chill it.";
+    return true;
+  }
+  if (milk > 0) {
+    milk--;
+    chilledMilk++;
+    bucketMilk.visible = milk > 0;
+    refreshFarm();
+    toast.textContent = `Put a pail of milk in the refrigerator (${chilledMilk} chilled).`;
+    return true;
+  }
+  fridgeOpen = false;
+  toast.textContent = "The refrigerator door closes.";
+  return true;
+}
 function farmAction() {
   const inField =
     hero.position.x > -40 &&
@@ -1401,6 +1448,8 @@ addEventListener("keydown", (e) => {
       hero.visible = true;
       hero.position.copy(vehicle.position).add(new THREE.Vector3(1, 0, 0));
       toast.textContent = "You climb down from the vehicle.";
+    } else if (interactWithFridge()) {
+      // The kitchen interaction takes precedence over vehicles beyond the house.
     } else if (hero.position.distanceTo(tractor.position) < 2.5) {
       driving = true;
       usingHarvester = false;
@@ -1803,7 +1852,21 @@ function loop() {
   const nearbyCow = cattle.find(
     (cow) => cow.position.distanceTo(hero.position) <= 2,
   );
-  milkPrompt.hidden = driving || !nearbyCow || Boolean(milkingCow);
+  const nearFridge = refrigerator && hero.position.distanceTo(refrigerator.position) <= 2;
+  milkPrompt.hidden = driving || (!nearbyCow && !nearFridge) || Boolean(milkingCow);
+  if (nearFridge)
+    milkPrompt.innerHTML = fridgeOpen
+      ? milk > 0
+        ? "PRESS <b>E</b> TO STORE MILK"
+        : "PRESS <b>E</b> TO CLOSE FRIDGE"
+      : "PRESS <b>E</b> TO OPEN FRIDGE";
+  else if (nearbyCow) milkPrompt.innerHTML = "PRESS <b>E</b> TO MILK COW";
+  if (refrigeratorDoor)
+    refrigeratorDoor.rotation.y = THREE.MathUtils.lerp(
+      refrigeratorDoor.rotation.y,
+      fridgeOpen ? -1.35 : 0,
+      Math.min(1, dt * 9),
+    );
   if (milkingCow) {
     milkingElapsed += dt;
     hero.scale.y = 0.7;
