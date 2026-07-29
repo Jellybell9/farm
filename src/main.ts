@@ -556,10 +556,25 @@ const creatures = [
   creature(-12, 13, 0xd6ac7c),
   creature(14, 9, 0x899e76),
 ];
+const shirtCanvas = document.createElement("canvas");
+shirtCanvas.width = shirtCanvas.height = 64;
+const shirtContext = shirtCanvas.getContext("2d")!;
+shirtContext.fillStyle = "#b63c32";
+shirtContext.fillRect(0, 0, 64, 64);
+for (let y = 0; y < 64; y += 16) {
+  for (let x = 0; x < 64; x += 16) {
+    if ((x / 16 + y / 16) % 2 === 0) {
+      shirtContext.fillStyle = "#234c78";
+      shirtContext.fillRect(x, y, 16, 16);
+    }
+  }
+}
+const shirtTexture = new THREE.CanvasTexture(shirtCanvas);
+shirtTexture.colorSpace = THREE.SRGBColorSpace;
 const hero = new THREE.Group(),
   denim = new THREE.MeshStandardMaterial({ color: 0x315b91, roughness: 0.8 }),
   flannel = new THREE.MeshStandardMaterial({
-    color: 0xa64031,
+    map: shirtTexture,
     roughness: 0.85,
   }),
   leather = new THREE.MeshStandardMaterial({
@@ -624,6 +639,14 @@ const beard = new THREE.Mesh(
 );
 beard.position.set(0, 1.23, -0.035);
 beard.scale.set(1, 1, 0.92);
+const mustache = new THREE.Group();
+for (const x of [-0.065, 0.065]) {
+  const curl = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), beardMat);
+  curl.position.set(x, 1.265, -0.23);
+  curl.scale.set(1.15, 0.38, 0.4);
+  curl.rotation.z = x < 0 ? -0.22 : 0.22;
+  mustache.add(curl);
+}
 for (const x of [-0.075, 0.075]) {
   const eye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 7, 6), eyeMat);
   eye.position.set(x, 1.34, -0.21);
@@ -683,6 +706,7 @@ hero.add(
   nose,
   hair,
   beard,
+  mustache,
   hatBrim,
   hatCrown,
   hatBand,
