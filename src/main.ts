@@ -1360,43 +1360,6 @@ function dropCarriedBale() {
   )
     sendCowToEatBale(bale);
 }
-function dropHarvest() {
-  for (let i = 0; i < 3; i++) {
-    const sheaf = new THREE.Group();
-    for (let stalk = 0; stalk < 6; stalk++) {
-      const stem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.025, 0.025, 0.55, 5),
-        hay,
-      );
-      stem.position.set(
-        (Math.random() - 0.5) * 0.24,
-        0.28,
-        (Math.random() - 0.5) * 0.24,
-      );
-      stem.rotation.z = (Math.random() - 0.5) * 0.45;
-      sheaf.add(stem);
-    }
-    sheaf.position
-      .copy(hero.position)
-      .add(
-        new THREE.Vector3(
-          (Math.random() - 0.5) * 0.4,
-          1.2 + i * 0.2,
-          (Math.random() - 0.5) * 0.4,
-        ),
-      );
-    scene.add(sheaf);
-    fallenWheat.push({
-      mesh: sheaf,
-      velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 1.1,
-        0.5 + i * 0.15,
-        (Math.random() - 0.5) * 1.1,
-      ),
-      settled: false,
-    });
-  }
-}
 const cutWheatMat = new THREE.MeshStandardMaterial({
   color: 0xe5bd4c,
   roughness: 0.85,
