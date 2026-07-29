@@ -5,7 +5,7 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
-  `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><p>FARM MARKET</p><h2>Farm Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><div>Chilled milk <b>15</b></div><button id="sellBale">SELL 1 BALE</button><button id="sellMilk">SELL 1 MILK</button></aside>`,
+  `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><button class="market-close" id="marketClose" aria-label="Close marketplace">×</button><p>FARM MARKET</p><h2>Farm Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><div>Chilled milk <b>15</b></div><button id="sellBale">SELL 1 BALE</button><button id="sellMilk">SELL 1 MILK</button></aside>`,
 );
 document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
   "afterend",
@@ -1525,6 +1525,9 @@ function toggleHelp(show = helpPanel.hidden) {
 }
 marketToggle.addEventListener("click", () => {
   marketplace.hidden = !marketplace.hidden;
+});
+document.querySelector<HTMLButtonElement>("#marketClose")!.addEventListener("click", () => {
+  marketplace.hidden = true;
 });
 helpButton.addEventListener("click", () => toggleHelp());
 document.querySelector<HTMLButtonElement>("#helpClose")!.addEventListener("click", () => toggleHelp(false));
