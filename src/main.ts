@@ -41,7 +41,7 @@ class NeonRunner {
     app.appendChild(this.renderer.domElement)
 
     this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200)
-    this.camera.position.set(0, 7.5, 10)
+    this.camera.position.set(0, 7.5, -10)
 
     this.scene.background = new THREE.Color(0x020617)
     this.scene.fog = new THREE.Fog(0x020617, 16, 90)
@@ -211,23 +211,23 @@ class NeonRunner {
     }
 
     this.roadSegments.forEach((segment) => {
-      segment.position.z -= this.speed * delta
-      if (segment.position.z < -this.roadLength * 1.5) {
-        segment.position.z += this.roadLength * 4
+      segment.position.z += this.speed * delta
+      if (segment.position.z > this.roadLength * 1.5) {
+        segment.position.z -= this.roadLength * 4
       }
     })
 
     for (let index = this.obstacles.length - 1; index >= 0; index -= 1) {
       const obstacle = this.obstacles[index]
-      obstacle.position.z -= this.speed * delta * 1.08
-      if (obstacle.position.z < -18) {
+      obstacle.position.z += this.speed * delta * 1.08
+      if (obstacle.position.z > 24) {
         this.scene.remove(obstacle)
         this.obstacles.splice(index, 1)
       }
     }
 
     this.playerGroup.position.x = THREE.MathUtils.lerp(this.playerGroup.position.x, this.lanes[this.targetLane], 0.2)
-    this.playerGroup.position.z += this.speed * delta * 0.12
+    this.playerGroup.position.z -= this.speed * delta * 0.12
 
     if (this.jumpRequested && this.jumpTime <= 0) {
       this.jumpTime = this.jumpDuration
@@ -244,8 +244,8 @@ class NeonRunner {
     }
 
     this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, this.playerGroup.position.x * 0.2, 0.06)
-    this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, this.playerGroup.position.z + 8.5, 0.06)
-    this.camera.lookAt(this.playerGroup.position.x * 0.25, 1.2, this.playerGroup.position.z - 2)
+    this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, this.playerGroup.position.z - 8.5, 0.06)
+    this.camera.lookAt(this.playerGroup.position.x * 0.25, 1.2, this.playerGroup.position.z + 2)
 
     this.checkCollisions()
   }
