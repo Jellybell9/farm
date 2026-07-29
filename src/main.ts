@@ -13,6 +13,10 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
+document.querySelector(".guide")!.insertAdjacentHTML(
+  "beforeend",
+  ` <b>P</b> pick up`,
+);
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<div class="interact-prompt" id="milkPrompt" hidden>PRESS <b>E</b> TO MILK COW</div>`,
@@ -839,9 +843,7 @@ const bucketHandle = new THREE.Mesh(
 bucketHandle.position.set(0, 0.26, 0);
 bucketHandle.rotation.x = Math.PI / 2;
 milkBucket.add(bucket, bucketMilk, bucketHandle);
-milkBucket.position.set(0.28, 0.04, -0.42);
-milkBucket.visible = false;
-hero.add(milkBucket);
+milkBucket.position.set(7.3, yWorld(7.3, -6.2) + 0.01, -6.2);
 hero.add(
   coat,
   jeansWaist,
@@ -862,6 +864,7 @@ hero.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
 scene.add(hero);
+scene.add(milkBucket);
 const milkStream = new THREE.Mesh(
   new THREE.CylinderGeometry(0.022, 0.022, 0.45, 6),
   new THREE.MeshStandardMaterial({ color: 0xfff8df, emissive: 0x443d29 }),
@@ -896,7 +899,8 @@ let vy = 0,
   dayElapsed = 0,
   storedBales = 0;
 let milkingCow: THREE.Group | null = null,
-  milkingElapsed = 0;
+  milkingElapsed = 0,
+  hasMilkBucket = false;
 const DAY_LENGTH_SECONDS = 20 * 60;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
@@ -1240,6 +1244,10 @@ function farmAction() {
         toast.textContent = "Finish milking before starting another cow.";
         return;
       }
+      if (!hasMilkBucket) {
+        toast.textContent = "Pick up the milk bucket by the barn first (P).";
+        return;
+      }
       if (nearestCow.userData.milkedToday) {
         toast.textContent = "This cow has already been milked today.";
         return;
@@ -1279,6 +1287,44 @@ function farmAction() {
   toast.textContent =
     "There is nothing to tend here. Visit the field or pasture.";
 }
+function pickUpNearby() {
+  if (driving || milkingCow) return;
+  if (!hasMilkBucket && hero.position.distanceTo(milkBucket.position) <= 1.65) {
+    hasMilkBucket = true;
+    hero.add(milkBucket);
+    milkBucket.position.set(0.32, 0.42, -0.26);
+    milkBucket.rotation.set(0, 0, 0);
+    toast.textContent = "Picked up the milk bucket. Take it to a cow and press E.";
+    return;
+  }
+  const shard = shards.find(
+    (candidate) =>
+      !candidate.userData.collected &&
+      hero.position.distanceTo(candidate.position) <= 1.5,
+  );
+  if (shard) {
+    shard.userData.collected = true;
+    shard.visible = false;
+    shardCount++;
+    refreshFarm();
+    toast.textContent = `Fresh crop collected! ${shardCount} of 12.`;
+    if (interacted && shardCount >= 3)
+      questText.textContent = "The market basket is ready. Enjoy the open farm.";
+    return;
+  }
+  const wheatIndex = fallenWheat.findIndex(
+    (drop) => drop.settled && hero.position.distanceTo(drop.mesh.position) <= 1.5,
+  );
+  if (wheatIndex >= 0) {
+    const [drop] = fallenWheat.splice(wheatIndex, 1);
+    scene.remove(drop.mesh);
+    wheat++;
+    refreshFarm();
+    toast.textContent = `Picked up loose wheat. Wheat: ${wheat}.`;
+    return;
+  }
+  toast.textContent = "Nothing nearby to pick up.";
+}
 addEventListener("keydown", (e) => {
   keys.add(e.code);
   if (
@@ -1290,6 +1336,10 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyF" && driving && usingLoader) {
     e.preventDefault();
     dropCarriedBale();
+  }
+  if (e.code === "KeyP") {
+    e.preventDefault();
+    pickUpNearby();
   }
   if (e.code === "KeyE") {
     if (driving) {
@@ -1731,10 +1781,9 @@ function loop() {
       milkingCow.userData.milkedToday = true;
       milkingCow = null;
       milkStream.visible = false;
-      milkBucket.visible = false;
       scene.remove(milkBucket);
       hero.add(milkBucket);
-      milkBucket.position.set(0.28, 0.04, -0.42);
+      milkBucket.position.set(0.32, 0.42, -0.26);
       hero.scale.y = 1;
       coat.position.y = 0.72;
       milk++;
@@ -1786,16 +1835,6 @@ function loop() {
       yWorld(s.position.x, s.position.z) +
       0.72 +
       Math.sin(t * 2 + s.position.x) * 0.12;
-    if (!s.userData.collected && hero.position.distanceTo(s.position) < 1.25) {
-      s.userData.collected = true;
-      s.visible = false;
-      shardCount++;
-      shardLabel.textContent = String(shardCount);
-      toast.textContent = `Fresh crop collected! ${shardCount} of 12.`;
-      if (interacted && shardCount >= 3)
-        questText.textContent =
-          "The market basket is ready. Enjoy the open farm.";
-    }
   });
   const d = hero.position.distanceTo(beacon.position);
   location.textContent =
