@@ -448,11 +448,12 @@ for (const [x, z] of [
   bale.castShadow = true;
   scene.add(bale);
 }
-// Pasture: a distinct grass pen with grazing cattle.
-fenceLine(5, 3, 12, false);
-fenceLine(5, 3, 10, true);
-fenceLine(14.9, 3, 10, true);
-fenceLine(5, 11.1, 12, false);
+// Pasture: a broad grass pen with room for a larger grazing herd.
+const pasture = { minX: 5, maxX: 24.8, minZ: 3, maxZ: 16.5 };
+fenceLine(pasture.minX, pasture.minZ, 23, false);
+fenceLine(pasture.minX, pasture.minZ, 16, true);
+fenceLine(pasture.maxX, pasture.minZ, 16, true);
+fenceLine(pasture.minX, pasture.maxZ, 23, false);
 const cowWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.9 });
 const cowBlack = new THREE.MeshStandardMaterial({ color: 0x1e2020, roughness: 0.92 });
 const cowMuzzle = new THREE.MeshStandardMaterial({ color: 0x6c5d60, roughness: 0.95 });
@@ -462,6 +463,14 @@ for (const [cowIndex, [x, z]] of [
   [10, 7],
   [13, 5.5],
   [8, 9.5],
+  [16, 4.8],
+  [19, 7.2],
+  [22, 5.6],
+  [15, 10.5],
+  [19, 12.2],
+  [22, 14.2],
+  [10, 13.2],
+  [6.8, 14.8],
 ].entries()) {
   const cow = new THREE.Group();
   // A cow's mass runs from shoulder to rump; keeping that axis aligned with the
@@ -629,28 +638,6 @@ beacon.add(sails);
 beacon.userData.sails = sails;
 beacon.position.set(27, yWorld(27, -22), -22);
 scene.add(beacon);
-function creature(x: number, z: number, color: number) {
-  const g = new THREE.Group(),
-    body = new THREE.Mesh(
-      new THREE.SphereGeometry(0.52, 10, 8),
-      new THREE.MeshStandardMaterial({ color }),
-    ),
-    head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.32, 9, 8),
-      new THREE.MeshStandardMaterial({ color }),
-    );
-  head.position.set(0, 0.16, 0.48);
-  g.add(body, head);
-  g.position.set(x, yWorld(x, z) + 0.5, z);
-  g.userData.origin = g.position.clone();
-  scene.add(g);
-  return g;
-}
-const creatures = [
-  creature(-15, 10, 0xd6ac7c),
-  creature(-12, 13, 0xd6ac7c),
-  creature(14, 9, 0x899e76),
-];
 const hero = new THREE.Group(),
   denim = new THREE.MeshStandardMaterial({ color: 0x2460ad, roughness: 0.8 }),
   flannel = new THREE.MeshStandardMaterial({
@@ -1068,9 +1055,9 @@ function farmAction() {
     hero.position.z < -3;
   const inPasture =
     hero.position.x > 4 &&
-    hero.position.x < 16 &&
+    hero.position.x < 26 &&
     hero.position.z > 2 &&
-    hero.position.z < 13;
+    hero.position.z < 18;
   if (inField) {
     if (ripePlots === 0) {
       toast.textContent = "These plots need another day to grow.";
@@ -1363,8 +1350,8 @@ function chooseGrazingSpot(cow: THREE.Group) {
   // Keep the cows clear of the fence while giving each a different patch of grass.
   for (let attempt = 0; attempt < 8; attempt++) {
     const candidate = new THREE.Vector2(
-      5.8 + Math.random() * 8.3,
-      3.8 + Math.random() * 6.5,
+      pasture.minX + 0.8 + Math.random() * (pasture.maxX - pasture.minX - 1.6),
+      pasture.minZ + 0.8 + Math.random() * (pasture.maxZ - pasture.minZ - 1.6),
     );
     if (
       cattle.every(
@@ -1378,8 +1365,8 @@ function chooseGrazingSpot(cow: THREE.Group) {
     }
   }
   cow.userData.target = new THREE.Vector2(
-    5.8 + Math.random() * 8.3,
-    3.8 + Math.random() * 6.5,
+    pasture.minX + 0.8 + Math.random() * (pasture.maxX - pasture.minX - 1.6),
+    pasture.minZ + 0.8 + Math.random() * (pasture.maxZ - pasture.minZ - 1.6),
   );
 }
 function updateCattle(dt: number, time: number) {
@@ -1495,13 +1482,6 @@ function loop() {
         questText.textContent =
           "The market basket is ready. Enjoy the open farm.";
     }
-  });
-  creatures.forEach((c, i) => {
-    const o = c.userData.origin as THREE.Vector3;
-    c.position.x = o.x + Math.sin(t * 0.5 + i) * 1.2;
-    c.position.z = o.z + Math.cos(t * 0.45 + i) * 0.8;
-    c.position.y = yWorld(c.position.x, c.position.z) + 0.5;
-    c.rotation.y = t * 0.5 + i;
   });
   const d = hero.position.distanceTo(beacon.position);
   location.textContent =
