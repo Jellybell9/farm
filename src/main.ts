@@ -7,6 +7,10 @@ document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><p>FARM MARKET</p><h2>Hay Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><button id="sellBale">SELL 1 BALE</button></aside>`,
 );
+document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
+  "afterend",
+  `<div>Milk <b id="milk">0</b></div>`,
+);
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
 
@@ -583,6 +587,7 @@ for (const [cowIndex, [x, z]] of [
   cow.userData.state = "grazing";
   cow.userData.stateTimer = 1 + Math.random() * 4;
   cow.userData.speed = 0.28 + Math.random() * 0.12;
+  cow.userData.milkedToday = false;
   cow.traverse((o) => {
     if (o instanceof THREE.Mesh) o.castShadow = true;
   });
@@ -815,6 +820,7 @@ let vy = 0,
   lastY = 0,
   lastRightClick = 0,
   wheat = 0,
+  milk = 0,
   cattleCare = 50,
   ripePlots = 45,
   farmDay = 1,
@@ -846,6 +852,7 @@ const toast = document.querySelector("#toast")!,
   shardLabel = document.querySelector("#shards")!,
   location = document.querySelector("#location")!,
   wheatLabel = document.querySelector("#wheat")!,
+  milkLabel = document.querySelector("#milk")!,
   careLabel = document.querySelector("#care")!,
   plotsLabel = document.querySelector("#plots")!,
   balesLabel = document.querySelector("#bales")!,
@@ -855,6 +862,7 @@ const toast = document.querySelector("#toast")!,
   storedLabel = document.querySelector("#stored")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
+  milkLabel.textContent = String(milk);
   careLabel.textContent = `${cattleCare}%`;
   plotsLabel.textContent = String(ripePlots);
   balesLabel.textContent = String(bales);
@@ -1160,6 +1168,25 @@ function farmAction() {
       toast.textContent = "The pasture is empty. The herd did not survive.";
       return;
     }
+    const nearestCow = cattle.reduce((nearest, cow) =>
+      cow.position.distanceTo(hero.position) < nearest.position.distanceTo(hero.position)
+        ? cow
+        : nearest,
+    );
+    if (nearestCow.position.distanceTo(hero.position) <= 2) {
+      if (nearestCow.userData.milkedToday) {
+        toast.textContent = "This cow has already been milked today.";
+        return;
+      }
+      nearestCow.userData.milkedToday = true;
+      milk++;
+      cattleCare = Math.min(100, cattleCare + 2);
+      refreshFarm();
+      toast.textContent = `Milk collected! You now have ${milk} pail${milk === 1 ? "" : "s"}.`;
+      questText.textContent =
+        "Milk each cow once a day, and keep the herd fed with three bales.";
+      return;
+    }
     if (fedBales >= 3) {
       toast.textContent = "The herd has all three bales it needs today.";
       return;
@@ -1280,6 +1307,7 @@ function endDay() {
   ripePlots = Math.min(18, ripePlots + 6);
   cropMaturity = Math.min(1, cropMaturity + 0.35);
   fedBales = 0;
+  cattle.forEach((cow) => (cow.userData.milkedToday = false));
   refreshFarm();
   if (cattle.length > 0)
     toast.textContent = dayReport
