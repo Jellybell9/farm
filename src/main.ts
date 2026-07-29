@@ -187,21 +187,49 @@ function addBox(
 }
 function barn(x: number, z: number) {
   const y = yWorld(x, z);
-  addBox(barnRed, x, y + 1.5, z, 6, 3, 4.5);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(3.7, 2.2, 4), farmWood);
-  roof.position.set(x, y + 4, z);
-  roof.rotation.y = Math.PI / 4;
+  // A broad, open-front equipment barn: like the farmhouse, the yard-facing
+  // side is left open so the interior reads as part of the homestead.
+  const width = 15,
+    depth = 10,
+    wallHeight = 3.6;
+  const floor = new THREE.MeshStandardMaterial({ color: 0x8f6745 });
+  addBox(floor, x, y + 0.1, z, width, 0.2, depth);
+  // Back and end walls shelter the machinery while the south side stays open.
+  addBox(barnRed, x, y + wallHeight / 2, z + depth / 2 - 0.12, width, wallHeight, 0.24);
+  addBox(barnRed, x - width / 2 + 0.12, y + wallHeight / 2, z, 0.24, wallHeight, depth);
+  addBox(barnRed, x + width / 2 - 0.12, y + wallHeight / 2, z, 0.24, wallHeight, depth);
+  // Timber posts make four generous parking bays without enclosing them.
+  for (const px of [x - width / 2 + 0.3, x - 3.75, x, x + 3.75, x + width / 2 - 0.3])
+    addBox(farmWood, px, y + 2.15, z - depth / 2 + 0.3, 0.28, 4.3, 0.28);
+  // A simple gable roof follows the rectangular wall footprint exactly.
+  const roofOverhang = 0.22,
+    halfRoofWidth = width / 2 + roofOverhang,
+    halfRoofDepth = depth / 2 + roofOverhang,
+    roofRise = 2.55;
+  const roofGeometry = new THREE.BufferGeometry();
+  roofGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      [
+        -halfRoofWidth, 0, -halfRoofDepth,
+        halfRoofWidth, 0, -halfRoofDepth,
+        -halfRoofWidth, 0, halfRoofDepth,
+        halfRoofWidth, 0, halfRoofDepth,
+        0, roofRise, -halfRoofDepth,
+        0, roofRise, halfRoofDepth,
+      ],
+      3,
+    ),
+  );
+  roofGeometry.setIndex([0, 1, 4, 2, 5, 3, 0, 4, 5, 0, 5, 2, 1, 3, 5, 1, 5, 4]);
+  roofGeometry.computeVertexNormals();
+  const roof = new THREE.Mesh(
+    roofGeometry,
+    new THREE.MeshStandardMaterial({ color: 0x5c3d2d, side: THREE.DoubleSide }),
+  );
+  roof.position.set(x, y + wallHeight, z);
   roof.castShadow = true;
   scene.add(roof);
-  addBox(
-    new THREE.MeshStandardMaterial({ color: 0x4e2c22 }),
-    x,
-    y + 0.8,
-    z - 2.28,
-    1.25,
-    1.6,
-    0.05,
-  );
 }
 function farmhouse(x: number, z: number) {
   const y = yWorld(x, z);
@@ -302,7 +330,7 @@ function fenceLine(x: number, z: number, length: number, vertical: boolean) {
     addBox(fence, px, y + 0.38, pz, 0.1, 0.75, 0.1);
   }
 }
-barn(4, -5);
+barn(10, -15);
 farmhouse(10, -5);
 // Two farm vehicles: a green baler tractor and an orange wheat-cutting combine.
 const tractor = new THREE.Group(),
@@ -345,8 +373,7 @@ for (const [x, z, r] of [
   wheel.castShadow = true;
   tractor.add(wheel);
 }
-tractor.position.set(1.6, yWorld(1.6, -5) + 0.05, -5);
-tractor.rotation.y = Math.PI / 2;
+tractor.position.set(5.25, yWorld(5.25, -15) + 0.05, -15);
 tractor.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
@@ -386,8 +413,7 @@ for (const [x, z, r] of [
   wheel.position.set(x, r, z);
   harvester.add(wheel);
 }
-harvester.position.set(-1.3, yWorld(-1.3, -5) + 0.05, -5);
-harvester.rotation.y = Math.PI / 2;
+harvester.position.set(8.85, yWorld(8.85, -15) + 0.05, -15);
 harvester.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
@@ -423,8 +449,7 @@ for (const [x, z, r] of [
   wheel.position.set(x, r, z);
   planter.add(wheel);
 }
-planter.position.set(-4.1, yWorld(-4.1, -5) + 0.05, -5);
-planter.rotation.y = Math.PI / 2;
+planter.position.set(12.45, yWorld(12.45, -15) + 0.05, -15);
 planter.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
@@ -466,14 +491,13 @@ for (const [x, z, r] of [
   wheel.position.set(x, r, z);
   loader.add(wheel);
 }
-loader.position.set(-6.7, yWorld(-6.7, -5) + 0.05, -5);
-loader.rotation.y = Math.PI / 2;
+loader.position.set(16.05, yWorld(16.05, -15) + 0.05, -15);
 loader.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
 scene.add(loader);
 const baleStack = new THREE.Group();
-baleStack.position.set(1.5, yWorld(1.5, -7) + 0.05, -7);
+baleStack.position.set(3.25, yWorld(3.25, -11.1) + 0.05, -11.1);
 scene.add(baleStack);
 // The southwest quarter is dedicated to one large working field.
 const soil = new THREE.MeshStandardMaterial({ color: 0x704a2d, roughness: 1 }),
