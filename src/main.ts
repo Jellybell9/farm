@@ -1000,7 +1000,7 @@ const toast = document.querySelector("#toast")!,
   milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
-  milkLabel.textContent = `${milk} carried / ${chilledMilk} chilled`;
+  milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
   careLabel.textContent = `${cattleCare}%`;
   plotsLabel.textContent = String(ripePlots);
   balesLabel.textContent = String(bales);
@@ -1340,6 +1340,10 @@ function farmAction() {
       }
       if (!hasMilkBucket) {
         toast.textContent = "Pick up the milk bucket by the barn first (P).";
+        return;
+      }
+      if (milk > 0) {
+        toast.textContent = "Your pail is full. Put it in the refrigerator before milking again.";
         return;
       }
       if (nearestCow.userData.milkedToday) {
