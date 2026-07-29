@@ -463,51 +463,89 @@ for (const [cowIndex, [x, z]] of [
   [8, 9.5],
 ].entries()) {
   const cow = new THREE.Group();
+  // A cow's mass runs from shoulder to rump; keeping that axis aligned with the
+  // face makes the silhouette read as an animal rather than a round ornament.
   const body = new THREE.Mesh(
     new THREE.SphereGeometry(0.45, 12, 10),
     cowWhite,
   );
-  body.position.y = 0.65;
-  body.scale.set(1.45, 1.05, 0.88);
+  body.position.set(0, 0.69, -0.05);
+  body.scale.set(1.12, 1.08, 1.62);
+  const shoulder = new THREE.Mesh(
+    new THREE.SphereGeometry(0.34, 10, 8),
+    cowWhite,
+  );
+  shoulder.position.set(0, 0.72, 0.48);
+  shoulder.scale.set(1.05, 1.12, 0.85);
+  const neck = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2, 0.27, 0.42, 10),
+    cowWhite,
+  );
+  neck.position.set(0, 0.82, 0.67);
+  neck.rotation.x = Math.PI / 2.8;
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.27, 10, 8),
     cowWhite,
   );
-  head.position.set(0, 0.76, 0.62);
+  head.position.set(0, 0.88, 0.96);
+  head.scale.set(0.86, 1.05, 1.18);
   const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), cowMuzzle);
-  muzzle.position.set(0, 0.69, 0.83);
-  muzzle.scale.set(1, 0.7, 0.7);
-  cow.add(body, head, muzzle);
-  for (const [legX, legZ] of [[-0.36, -0.22], [0.36, -0.22], [-0.36, 0.22], [0.36, 0.22]]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.5, 8), cowWhite);
-    leg.position.set(legX, 0.25, legZ);
+  muzzle.position.set(0, 0.79, 1.19);
+  muzzle.scale.set(1.05, 0.68, 0.82);
+  cow.add(body, shoulder, neck, head, muzzle);
+  // Staggered, slightly tapered legs give the animal a stable natural stance.
+  for (const [legX, legZ, kneeX] of [[-0.35, -0.52, -0.03], [0.35, -0.52, 0.03], [-0.36, 0.48, 0.025], [0.36, 0.48, -0.025]]) {
+    const upperLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.3, 8), cowWhite);
+    upperLeg.position.set(legX, 0.43, legZ);
+    upperLeg.rotation.z = kneeX * 1.5;
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.34, 8), cowWhite);
+    leg.position.set(legX + kneeX, 0.14, legZ + 0.025);
+    leg.rotation.z = -kneeX;
     const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.1, 8), cowBlack);
-    hoof.position.set(legX, 0.04, legZ);
-    cow.add(leg, hoof);
+    hoof.position.set(legX + kneeX, -0.04, legZ + 0.065);
+    hoof.scale.set(1, 0.65, 1.28);
+    cow.add(upperLeg, leg, hoof);
   }
   for (const xOffset of [-0.2, 0.2]) {
     const ear = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), cowWhite);
-    ear.position.set(xOffset, 0.9, 0.62);
-    ear.scale.set(1.2, 0.45, 0.7);
+    ear.position.set(xOffset * 1.25, 1.05, 0.95);
+    ear.scale.set(1.45, 0.36, 0.68);
     const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 6), cowMuzzle);
-    horn.position.set(xOffset, 1.01, 0.62);
-    horn.rotation.x = -0.45;
+    horn.position.set(xOffset, 1.15, 0.92);
+    horn.rotation.x = -0.75;
     cow.add(ear, horn);
   }
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.035, 0.48, 6), cowWhite);
-  tail.position.set(0, 0.55, -0.56);
-  tail.rotation.x = 0.65;
-  const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 6), cowBlack);
-  tailTip.position.set(0, 0.34, -0.73);
+  const tail = new THREE.Mesh(
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0.74, -0.73),
+        new THREE.Vector3(0.04, 0.57, -0.91),
+        new THREE.Vector3(-0.04, 0.31, -1.02),
+        new THREE.Vector3(0.02, 0.14, -0.98),
+      ]),
+      12,
+      0.028,
+      6,
+      false,
+    ),
+    cowWhite,
+  );
+  const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.07, 7, 6), cowBlack);
+  tailTip.position.set(0.02, 0.11, -0.98);
   cow.add(tail, tailTip);
-  for (const [spotX, spotY, spotZ] of [[-0.35, 0.7, -0.33], [0.22, 0.82, 0.32], [0.06, 0.98, -0.03]]) {
-    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.18, 9, 7), cowBlack);
-    spot.position.set(spotX, spotY, spotZ);
-    spot.scale.set(1 + (cowIndex % 2) * 0.25, 0.8, 0.2);
-    cow.add(spot);
+  // Paper-thin decal meshes sit tangent to the hide, avoiding the raised,
+  // pebble-like spots created by flattened spheres.
+  for (const [spotY, spotZ, spotSize] of [[0.72, -0.3, 0.2], [0.84, 0.26, 0.16], [0.96, -0.02, 0.13]]) {
+    for (const side of [-1, 1]) {
+      const spot = new THREE.Mesh(new THREE.CircleGeometry(spotSize, 9), cowBlack);
+      spot.position.set(side * 0.51, spotY, spotZ);
+      spot.rotation.y = side * Math.PI / 2;
+      spot.scale.set(1 + (cowIndex % 2) * 0.25, 0.8, 1);
+      cow.add(spot);
+    }
   }
-  const facePatch = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), cowBlack);
-  facePatch.position.set(cowIndex % 2 ? -0.11 : 0.11, 0.84, 0.84);
+  const facePatch = new THREE.Mesh(new THREE.CircleGeometry(0.11, 8), cowBlack);
+  facePatch.position.set(cowIndex % 2 ? -0.1 : 0.1, 0.93, 1.265);
   facePatch.scale.set(0.75, 1, 0.18);
   cow.add(facePatch);
   cow.position.set(x, yWorld(x, z), z);
