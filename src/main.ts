@@ -12,7 +12,7 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
   `<div>Milk <b id="milk">0</b></div>`,
 );
 document.querySelector("#sleep")!.outerHTML =
-  `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
+  `<div>Day remaining <b id="dayTimer">15:00</b></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<div class="interact-prompt" id="milkPrompt" hidden>PRESS <b>E</b> TO MILK COW</div>`,
@@ -1174,7 +1174,7 @@ function standUp() {
   arms.forEach((arm) => (arm.rotation.x = 0));
   toast.textContent = "The farmer stands up.";
 }
-const DAY_LENGTH_SECONDS = 20 * 60;
+const DAY_LENGTH_SECONDS = 15 * 60;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
 const baleObjects: THREE.Mesh[] = [],
