@@ -2,7 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
-app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Harvest wheat, then take care of the cattle.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="guide"><b>ARROWS</b> move / drive <b>DRAG</b> look around <b>SHIFT</b> sprint <b>SPACE</b> jump <b>E</b> interact / tractor <b>F</b> drop bale</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`;
+app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="guide"><b>ARROWS</b> move / drive <b>DRAG</b> look around <b>SHIFT</b> sprint <b>SPACE</b> jump <b>E</b> interact / tractor <b>F</b> drop bale</div><div class="toast" id="toast">Walk into the wheat field and press E to harvest.</div></div>`;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87c7db);
@@ -820,6 +820,7 @@ let vy = 0,
   lastCut = 0,
   looseStraw = 0,
   bales = 0,
+  fedBales = 0,
   storedBales = 0;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
@@ -839,14 +840,51 @@ const toast = document.querySelector("#toast")!,
   careLabel = document.querySelector("#care")!,
   plotsLabel = document.querySelector("#plots")!,
   balesLabel = document.querySelector("#bales")!,
+  fedBalesLabel = document.querySelector("#fedBales")!,
   storedLabel = document.querySelector("#stored")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   careLabel.textContent = `${cattleCare}%`;
   plotsLabel.textContent = String(ripePlots);
   balesLabel.textContent = String(bales);
+  fedBalesLabel.textContent = `${fedBales} / 3`;
   storedLabel.textContent = String(storedBales);
   shardLabel.textContent = String(shardCount);
+}
+function feedHerdBale(bale: THREE.Mesh) {
+  if (cattle.length === 0 || fedBales >= 3) return false;
+  const baleIndex = baleObjects.indexOf(bale);
+  if (baleIndex < 0) return false;
+  baleObjects.splice(baleIndex, 1);
+  scene.remove(bale);
+  if (lastDroppedBale === bale) lastDroppedBale = null;
+  bales = Math.max(0, bales - 1);
+  fedBales++;
+  cattleCare = Math.min(100, cattleCare + 12);
+  refreshFarm();
+  toast.textContent = `The cows eat the bale (${fedBales}/3 today).`;
+  if (fedBales === 3)
+    questText.textContent =
+      "The herd is fed for today. You can safely end the day.";
+  return true;
+}
+function sendCowToEatBale(bale: THREE.Mesh) {
+  if (cattle.length === 0 || fedBales >= 3) return false;
+  if (cattle.some((cow) => cow.userData.feedBale === bale)) return true;
+  const pendingMeals = cattle.filter((cow) => cow.userData.feedBale).length;
+  if (fedBales + pendingMeals >= 3) return false;
+  const cow = cattle
+    .filter((candidate) => !candidate.userData.feedBale)
+    .sort(
+      (a, b) =>
+        a.position.distanceTo(bale.position) - b.position.distanceTo(bale.position),
+    )[0];
+  if (!cow) return false;
+  cow.userData.feedBale = bale;
+  cow.userData.eatingTime = 0;
+  cow.userData.state = "walking";
+  toast.textContent = "A cow is walking over to eat the bale.";
+  return true;
 }
 function dropCarriedBale() {
   if (!carriedBale) {
@@ -904,6 +942,13 @@ function dropCarriedBale() {
   }
   carriedBale = null;
   refreshFarm();
+  if (
+    bale.position.x > pasture.minX &&
+    bale.position.x < pasture.maxX &&
+    bale.position.z > pasture.minZ &&
+    bale.position.z < pasture.maxZ
+  )
+    sendCowToEatBale(bale);
 }
 function dropHarvest() {
   for (let i = 0; i < 3; i++) {
@@ -1073,21 +1118,30 @@ function farmAction() {
     refreshFarm();
     toast.textContent = "Harvested wheat dropped at your feet.";
     questText.textContent =
-      "The field is producing. Feed the cattle in the pasture.";
+      "Collect wheat with the tractor, make bales, then feed the herd.";
     return;
   }
   if (inPasture) {
-    if (wheat === 0) {
-      toast.textContent = "The cattle need wheat. Harvest the fields first.";
+    if (cattle.length === 0) {
+      toast.textContent = "The pasture is empty. The herd did not survive.";
       return;
     }
-    wheat--;
-    cattleCare = Math.min(100, cattleCare + 18);
-    refreshFarm();
-    toast.textContent = "The cattle are well fed and content.";
-    if (cattleCare >= 80)
-      questText.textContent =
-        "The herd is thriving. Your farm is off to a fine start.";
+    if (fedBales >= 3) {
+      toast.textContent = "The herd has all three bales it needs today.";
+      return;
+    }
+    const pastureBale = baleObjects.find(
+      (bale) =>
+        bale.position.x > pasture.minX &&
+        bale.position.x < pasture.maxX &&
+        bale.position.z > pasture.minZ &&
+        bale.position.z < pasture.maxZ,
+    );
+    if (!pastureBale) {
+      toast.textContent = "Put a bale in the pasture with the loader so the cows can eat it.";
+      return;
+    }
+    sendCowToEatBale(pastureBale);
     return;
   }
   toast.textContent =
@@ -1157,7 +1211,7 @@ addEventListener("keydown", (e) => {
     } else if (hero.position.distanceTo(beacon.position) < 4) {
       interacted = true;
       questText.textContent =
-        "The mill is turning. Bring wheat from the field to the cattle.";
+        "The mill is turning. Make three bales for the herd before nightfall.";
       toast.textContent = "The windmill hums to life!";
     } else farmAction();
   }
@@ -1169,14 +1223,24 @@ dropButton.addEventListener("pointerdown", (e) => {
   dropCarriedBale();
 });
 document.querySelector("#sleep")!.addEventListener("click", () => {
+  if (cattle.length > 0 && fedBales < 3) {
+    const herdSize = cattle.length;
+    cattle.forEach((cow) => scene.remove(cow));
+    cattle.splice(0, cattle.length);
+    cattleCare = 0;
+    questText.textContent = "The herd died after going without its three daily bales.";
+    toast.textContent = `${herdSize} cattle died. Feed three bales every day to protect a herd.`;
+  } else if (cattle.length > 0) {
+    cattleCare = Math.min(100, cattleCare + 6);
+    questText.textContent = "Make three more bales before the next day ends.";
+  }
   farmDay++;
   ripePlots = Math.min(18, ripePlots + 6);
   cropMaturity = Math.min(1, cropMaturity + 0.35);
-  cattleCare = Math.max(0, cattleCare - 8);
+  fedBales = 0;
   refreshFarm();
-  toast.textContent = `Day ${farmDay}: the wheat has grown, and the cattle need attention.`;
-  if (cattleCare < 35)
-    questText.textContent = "The cattle are unhappy. Feed them wheat soon.";
+  if (cattle.length > 0)
+    toast.textContent = `Day ${farmDay}: feed the herd three bales before ending the day.`;
 });
 refreshFarm();
 const youngWheatColor = new THREE.Color(0x4f913f),
@@ -1380,6 +1444,54 @@ function updateCattle(dt: number, time: number) {
     }[];
     const legs = cow.userData.legs as { upper: THREE.Mesh; lower: THREE.Mesh }[];
     cow.userData.stateTimer -= dt;
+    const feedBale = cow.userData.feedBale as THREE.Mesh | undefined;
+    if (feedBale) {
+      const dx = feedBale.position.x - cow.position.x,
+        dz = feedBale.position.z - cow.position.z,
+        distance = Math.hypot(dx, dz);
+      if (distance > 0.9) {
+        grazeParts.forEach(({ part, y, z }) => {
+          part.position.y = THREE.MathUtils.lerp(part.position.y, y, dt * 6);
+          part.position.z = THREE.MathUtils.lerp(part.position.z, z, dt * 6);
+        });
+        const heading = Math.atan2(dx, dz);
+        const turn = THREE.MathUtils.euclideanModulo(
+          heading - cow.rotation.y + Math.PI,
+          Math.PI * 2,
+        ) - Math.PI;
+        cow.rotation.y += turn * Math.min(1, dt * 2.5);
+        const stride = Math.sin(time * 11 + index * 1.7);
+        legs.forEach(({ upper, lower }, legIndex) => {
+          const phase = legIndex === 0 || legIndex === 3 ? 1 : -1;
+          upper.rotation.x = stride * phase * 0.48;
+          lower.rotation.x = -stride * phase * 0.28;
+        });
+        const step = Math.min(distance, cow.userData.speed * dt);
+        cow.position.x += (dx / distance) * step;
+        cow.position.z += (dz / distance) * step;
+        cow.position.y = yWorld(cow.position.x, cow.position.z);
+        return;
+      }
+      const eatingTime = (cow.userData.eatingTime as number) + dt;
+      cow.userData.eatingTime = eatingTime;
+      legs.forEach(({ upper, lower }) => {
+        upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 6);
+        lower.rotation.x = THREE.MathUtils.lerp(lower.rotation.x, 0, dt * 6);
+      });
+      const headLowering = 0.28 + Math.sin(time * 8) * 0.035;
+      grazeParts.forEach(({ part, y, z }) => {
+        part.position.y = THREE.MathUtils.lerp(part.position.y, y - headLowering, dt * 8);
+        part.position.z = THREE.MathUtils.lerp(part.position.z, z + 0.12, dt * 8);
+      });
+      feedBale.scale.setScalar(Math.max(0.03, 1 - eatingTime / 2));
+      if (eatingTime >= 2) {
+        cow.userData.feedBale = undefined;
+        cow.userData.state = "grazing";
+        cow.userData.stateTimer = 3 + Math.random() * 5;
+        feedHerdBale(feedBale);
+      }
+      return;
+    }
     if (cow.userData.state === "grazing") {
       legs.forEach(({ upper, lower }) => {
         upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 6);
