@@ -453,24 +453,64 @@ fenceLine(5, 3, 12, false);
 fenceLine(5, 3, 10, true);
 fenceLine(14.9, 3, 10, true);
 fenceLine(5, 11.1, 12, false);
-for (const [x, z] of [
+const cowWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.9 });
+const cowBlack = new THREE.MeshStandardMaterial({ color: 0x1e2020, roughness: 0.92 });
+const cowMuzzle = new THREE.MeshStandardMaterial({ color: 0x6c5d60, roughness: 0.95 });
+for (const [cowIndex, [x, z]] of [
   [7, 5],
   [10, 7],
   [13, 5.5],
   [8, 9.5],
-]) {
+].entries()) {
   const cow = new THREE.Group();
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.9, 0.5, 0.5),
-    new THREE.MeshStandardMaterial({ color: 0xf5f0df }),
+    new THREE.SphereGeometry(0.45, 12, 10),
+    cowWhite,
   );
+  body.position.y = 0.57;
+  body.scale.set(1.32, 0.82, 0.78);
   const head = new THREE.Mesh(
-    new THREE.BoxGeometry(0.32, 0.32, 0.32),
-    new THREE.MeshStandardMaterial({ color: 0xf5f0df }),
+    new THREE.SphereGeometry(0.27, 10, 8),
+    cowWhite,
   );
-  head.position.set(0, 0.05, 0.52);
-  cow.add(body, head);
-  cow.position.set(x, yWorld(x, z) + 0.42, z);
+  head.position.set(0, 0.64, 0.57);
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), cowMuzzle);
+  muzzle.position.set(0, 0.57, 0.78);
+  muzzle.scale.set(1, 0.7, 0.7);
+  cow.add(body, head, muzzle);
+  for (const [legX, legZ] of [[-0.36, -0.22], [0.36, -0.22], [-0.36, 0.22], [0.36, 0.22]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.5, 8), cowWhite);
+    leg.position.set(legX, 0.25, legZ);
+    const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.1, 8), cowBlack);
+    hoof.position.set(legX, 0.04, legZ);
+    cow.add(leg, hoof);
+  }
+  for (const xOffset of [-0.2, 0.2]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), cowWhite);
+    ear.position.set(xOffset, 0.78, 0.57);
+    ear.scale.set(1.2, 0.45, 0.7);
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 6), cowMuzzle);
+    horn.position.set(xOffset, 0.89, 0.57);
+    horn.rotation.x = -0.45;
+    cow.add(ear, horn);
+  }
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.035, 0.48, 6), cowWhite);
+  tail.position.set(0, 0.55, -0.56);
+  tail.rotation.x = 0.65;
+  const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 6), cowBlack);
+  tailTip.position.set(0, 0.34, -0.73);
+  cow.add(tail, tailTip);
+  for (const [spotX, spotY, spotZ] of [[-0.35, 0.7, -0.33], [0.22, 0.82, 0.32], [0.06, 0.98, -0.03]]) {
+    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.18, 9, 7), cowBlack);
+    spot.position.set(spotX, spotY, spotZ);
+    spot.scale.set(1 + (cowIndex % 2) * 0.25, 0.8, 0.2);
+    cow.add(spot);
+  }
+  const facePatch = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), cowBlack);
+  facePatch.position.set(cowIndex % 2 ? -0.11 : 0.11, 0.72, 0.79);
+  facePatch.scale.set(0.75, 1, 0.18);
+  cow.add(facePatch);
+  cow.position.set(x, yWorld(x, z), z);
   cow.rotation.y = Math.random() * Math.PI;
   cow.traverse((o) => {
     if (o instanceof THREE.Mesh) o.castShadow = true;
