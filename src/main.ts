@@ -473,7 +473,7 @@ fenceLine(pasture.minX, pasture.maxZ, 23, false);
 const cowWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.9 });
 const cowBlack = new THREE.MeshStandardMaterial({ color: 0x1e2020, roughness: 0.92 });
 const cowMuzzle = new THREE.MeshStandardMaterial({ color: 0x6c5d60, roughness: 0.95 });
-const cowUdder = new THREE.MeshStandardMaterial({ color: 0xe9a2a7, roughness: 0.9 });
+const cowUdder = new THREE.MeshStandardMaterial({ color: 0xff9eae, roughness: 0.82 });
 const cattle: THREE.Group[] = [];
 for (const [cowIndex, [x, z]] of [
   [7, 5],
@@ -564,10 +564,18 @@ for (const [cowIndex, [x, z]] of [
   const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.07, 7, 6), cowBlack);
   tailTip.position.set(0.02, 0.11, -0.98);
   cow.add(tail, tailTip);
-  const udder = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), cowUdder);
-  udder.position.set(0, 0.31, -0.12);
-  udder.scale.set(1.15, 0.65, 0.9);
+  const udder = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8), cowUdder);
+  udder.position.set(0, 0.46, -0.12);
+  udder.scale.set(1.2, 0.72, 0.95);
   cow.add(udder);
+  for (const [teatX, teatZ] of [[-0.09, -0.2], [0.09, -0.2], [-0.09, -0.04], [0.09, -0.04]]) {
+    const teat = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.035, 0.09, 4, 6),
+      cowUdder,
+    );
+    teat.position.set(teatX, 0.35, teatZ);
+    cow.add(teat);
+  }
   // Paper-thin decal meshes sit tangent to the hide, avoiding the raised,
   // pebble-like spots created by flattened spheres.
   for (const [spotY, spotZ, spotSize] of [[0.72, -0.3, 0.2], [0.84, 0.26, 0.16], [0.96, -0.02, 0.13]]) {
@@ -1700,9 +1708,11 @@ function loop() {
       arm.rotation.z = index === 0 ? 0.45 : -0.45;
     });
     const udderPosition = milkingCow.localToWorld(
-      new THREE.Vector3(0, 0.29, -0.12),
+      new THREE.Vector3(0, 0.46, -0.12),
     );
-    milkBucket.position.copy(udderPosition).add(new THREE.Vector3(0, -0.72, 0));
+    milkBucket.position.copy(udderPosition);
+    milkBucket.position.y =
+      yWorld(milkBucket.position.x, milkBucket.position.z) + 0.01;
     milkStream.position.copy(udderPosition).add(new THREE.Vector3(0, -0.225, 0));
     milkStream.visible = true;
     if (milkingElapsed >= 2.4) {
