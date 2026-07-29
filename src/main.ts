@@ -27,7 +27,7 @@ class NeonRunner {
   private jumpRequested = false
   private readonly pressedKeys = new Set<string>()
 
-  private readonly lanes = [-3.4, 0, 3.4]
+  private readonly lanes = [3.4, 0, -3.4]
   private readonly roadLength = 42
   private readonly speed = 24
 
@@ -151,12 +151,12 @@ class NeonRunner {
       this.pressedKeys.add(event.code)
 
       if (event.code === 'ArrowLeft' || event.code === 'KeyA') {
-        this.targetLane = Math.max(0, this.targetLane - 1)
+        this.targetLane = Math.min(this.lanes.length - 1, this.targetLane + 1)
         event.preventDefault()
       }
 
       if (event.code === 'ArrowRight' || event.code === 'KeyD') {
-        this.targetLane = Math.min(this.lanes.length - 1, this.targetLane + 1)
+        this.targetLane = Math.max(0, this.targetLane - 1)
         event.preventDefault()
       }
 
@@ -243,11 +243,11 @@ class NeonRunner {
     }
 
     if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('KeyA')) {
-      this.targetLane = Math.max(0, this.targetLane - 1)
+      this.targetLane = Math.min(this.lanes.length - 1, this.targetLane + 1)
     }
 
     if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('KeyD')) {
-      this.targetLane = Math.min(this.lanes.length - 1, this.targetLane + 1)
+      this.targetLane = Math.max(0, this.targetLane - 1)
     }
 
     this.playerGroup.position.x = THREE.MathUtils.lerp(this.playerGroup.position.x, this.lanes[this.targetLane], 0.22)
