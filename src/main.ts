@@ -663,23 +663,36 @@ const hatBand = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xc19a4a, metalness: 0.15 }),
 );
 hatBand.position.y = 1.59;
+const legs: THREE.Group[] = [];
 for (const x of [-0.125, 0.125]) {
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.62, 10), denim);
-  leg.position.set(x, 0.32, 0);
+  const leg = new THREE.Group();
+  leg.position.set(x, 0.63, 0);
+  const jeans = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.12, 0.62, 10),
+    denim,
+  );
+  jeans.position.y = -0.31;
   const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.29), boot);
-  shoe.position.set(x, 0.08, -0.06);
-  hero.add(leg, shoe);
+  shoe.position.set(0, -0.55, -0.06);
+  leg.add(jeans, shoe);
+  legs.push(leg);
+  hero.add(leg);
 }
+const arms: THREE.Group[] = [];
 for (const x of [-0.32, 0.32]) {
+  const armGroup = new THREE.Group();
+  armGroup.position.set(x, 1, 0);
+  armGroup.rotation.z = x < 0 ? 0.12 : -0.12;
   const arm = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.07, 0.4, 5, 7),
     flannel,
   );
-  arm.position.set(x, 0.8, 0);
-  arm.rotation.z = x < 0 ? 0.12 : -0.12;
+  arm.position.y = -0.2;
   const hand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 7), skin);
-  hand.position.set(x, 0.55, -0.02);
-  hero.add(arm, hand);
+  hand.position.set(0, -0.45, -0.02);
+  armGroup.add(arm, hand);
+  arms.push(armGroup);
+  hero.add(armGroup);
 }
 hero.add(
   coat,
@@ -1269,6 +1282,16 @@ function loop() {
     hero.position.z += dz * speed * dt;
     hero.rotation.y = Math.atan2(-dx, -dz);
     coat.position.y = 0.7 + Math.sin(t * 15) * 0.05;
+    const stride = Math.sin(t * 15);
+    legs.forEach((leg, index) => {
+      leg.rotation.x = (index === 0 ? 1 : -1) * stride * 0.65;
+    });
+    arms.forEach((arm, index) => {
+      arm.rotation.x = (index === 0 ? -1 : 1) * stride * 0.75;
+    });
+  } else {
+    legs.forEach((leg) => (leg.rotation.x *= 0.75));
+    arms.forEach((arm) => (arm.rotation.x *= 0.75));
   }
   hero.position.x = Math.max(-51, Math.min(51, hero.position.x));
   hero.position.z = Math.max(-51, Math.min(51, hero.position.z));
