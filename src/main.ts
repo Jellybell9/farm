@@ -12,7 +12,7 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
   `<div>Milk <b id="milk">0</b></div>`,
 );
 document.querySelector("#sleep")!.outerHTML =
-  `<div>Day remaining <b id="dayTimer">15:00</b></div>`;
+  `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<div class="interact-prompt" id="milkPrompt" hidden>PRESS <b>E</b> TO MILK COW</div>`,
@@ -113,12 +113,24 @@ for (let x = -23; x <= 23; x++)
 function yWorld(x: number, z: number) {
   return hAt(Math.round(x / cellSize), Math.round(z / cellSize)) + 0.12;
 }
+type WalkableFloor = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  topY: number;
+};
+const walkableFloors: WalkableFloor[] = [];
 function playerGroundY(x: number, z: number) {
   const terrainY = yWorld(x, z);
-  // The farmhouse floor is raised slightly above the terrain, so the farmer's
-  // feet rest on its top surface rather than clipping through its planks.
-  const onFarmhouseFloor = x > 5.9 && x < 14.1 && z > -8.1 && z < -1.9;
-  return onFarmhouseFloor ? Math.max(terrainY, yWorld(10, -5) + 0.23) : terrainY;
+  const floorY = walkableFloors.reduce(
+    (highest, floor) =>
+      x >= floor.minX && x <= floor.maxX && z >= floor.minZ && z <= floor.maxZ
+        ? Math.max(highest, floor.topY + 0.01)
+        : highest,
+    terrainY,
+  );
+  return floorY;
 }
 const trunk = new THREE.MeshStandardMaterial({ color: 0x68482d }),
   leaf = new THREE.MeshStandardMaterial({ color: 0x246946, flatShading: true }),
@@ -274,6 +286,13 @@ function farmhouse(x: number, z: number) {
 
   // An oversized plank floor makes the interior feel continuous with the lawn.
   addBox(floor, x, y + 0.12, z, 8.2, 0.22, 6.2);
+  walkableFloors.push({
+    minX: x - 4.1,
+    maxX: x + 4.1,
+    minZ: z - 3.1,
+    maxZ: z + 3.1,
+    topY: y + 0.23,
+  });
   // Back and side walls frame the rooms, leaving the whole south face open.
   addBox(wall, x, y + 1.65, z + 2.95, 8.2, 3.3, 0.22);
   addBox(wall, x - 4, y + 1.65, z + 1.85, 0.22, 3.3, 2.2);
@@ -1174,7 +1193,7 @@ function standUp() {
   arms.forEach((arm) => (arm.rotation.x = 0));
   toast.textContent = "The farmer stands up.";
 }
-const DAY_LENGTH_SECONDS = 15 * 60;
+const DAY_LENGTH_SECONDS = 20 * 60;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
 const baleObjects: THREE.Mesh[] = [],
