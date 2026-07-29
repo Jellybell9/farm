@@ -494,6 +494,7 @@ for (const [cowIndex, [x, z]] of [
   muzzle.position.set(0, 0.79, 1.19);
   muzzle.scale.set(1.05, 0.68, 0.82);
   const headParts: THREE.Object3D[] = [head, muzzle];
+  const cowLegs: { upper: THREE.Mesh; lower: THREE.Mesh }[] = [];
   cow.add(body, shoulder, neck, head, muzzle);
   // Staggered, slightly tapered legs give the animal a stable natural stance.
   for (const [legX, legZ, kneeX] of [[-0.35, -0.52, -0.03], [0.35, -0.52, 0.03], [-0.36, 0.48, 0.025], [0.36, 0.48, -0.025]]) {
@@ -506,6 +507,7 @@ for (const [cowIndex, [x, z]] of [
     const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.1, 8), cowBlack);
     hoof.position.set(legX + kneeX, -0.04, legZ + 0.065);
     hoof.scale.set(1, 0.65, 1.28);
+    cowLegs.push({ upper: upperLeg, lower: leg });
     cow.add(upperLeg, leg, hoof);
   }
   for (const xOffset of [-0.2, 0.2]) {
@@ -559,6 +561,7 @@ for (const [cowIndex, [x, z]] of [
     y: part.position.y,
     z: part.position.z,
   }));
+  cow.userData.legs = cowLegs;
   cow.userData.target = new THREE.Vector2(x, z);
   cow.userData.state = "grazing";
   cow.userData.stateTimer = 1 + Math.random() * 4;
@@ -1386,8 +1389,13 @@ function updateCattle(dt: number, time: number) {
       y: number;
       z: number;
     }[];
+    const legs = cow.userData.legs as { upper: THREE.Mesh; lower: THREE.Mesh }[];
     cow.userData.stateTimer -= dt;
     if (cow.userData.state === "grazing") {
+      legs.forEach(({ upper, lower }) => {
+        upper.rotation.x = THREE.MathUtils.lerp(upper.rotation.x, 0, dt * 6);
+        lower.rotation.x = THREE.MathUtils.lerp(lower.rotation.x, 0, dt * 6);
+      });
       const headLowering = 0.2 + Math.sin(time * 2.2 + index) * 0.025;
       grazeParts.forEach(({ part, y, z }) => {
         part.position.y = THREE.MathUtils.lerp(part.position.y, y - headLowering, dt * 6);
@@ -1419,6 +1427,12 @@ function updateCattle(dt: number, time: number) {
       Math.PI * 2,
     ) - Math.PI;
     cow.rotation.y += turn * Math.min(1, dt * 2.5);
+    const stride = Math.sin(time * 11 + index * 1.7);
+    legs.forEach(({ upper, lower }, legIndex) => {
+      const phase = legIndex === 0 || legIndex === 3 ? 1 : -1;
+      upper.rotation.x = stride * phase * 0.48;
+      lower.rotation.x = -stride * phase * 0.28;
+    });
     const step = Math.min(distance, cow.userData.speed * dt);
     cow.position.x += (dx / distance) * step;
     cow.position.z += (dz / distance) * step;
