@@ -151,11 +151,14 @@ for (let i = 0; i < 180; i++) {
     z = (Math.random() - 0.5) * 96;
   const insideField = x > -40 && x < -2 && z > -40 && z < -2;
   const insidePasture = x > 4 && x < 25.8 && z > 2 && z < 17.5;
+  // Keep the whole barn pad and its north-facing approach clear for machinery.
+  const insideBarnGrounds = x > 1.5 && x < 18.5 && z > -31 && z < -17;
   if (
     Math.hypot(x, z) < 10 ||
     (Math.abs(x - 27) < 8 && Math.abs(z + 22) < 9) ||
     insideField ||
-    insidePasture
+    insidePasture ||
+    insideBarnGrounds
   )
     continue;
   if (Math.random() > 0.34) tree(x, z, 0.65 + Math.random() * 0.7);
