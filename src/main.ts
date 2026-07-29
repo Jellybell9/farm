@@ -456,6 +456,7 @@ fenceLine(5, 11.1, 12, false);
 const cowWhite = new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.9 });
 const cowBlack = new THREE.MeshStandardMaterial({ color: 0x1e2020, roughness: 0.92 });
 const cowMuzzle = new THREE.MeshStandardMaterial({ color: 0x6c5d60, roughness: 0.95 });
+const cattle: THREE.Group[] = [];
 for (const [cowIndex, [x, z]] of [
   [7, 5],
   [10, 7],
@@ -492,6 +493,7 @@ for (const [cowIndex, [x, z]] of [
   const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), cowMuzzle);
   muzzle.position.set(0, 0.79, 1.19);
   muzzle.scale.set(1.05, 0.68, 0.82);
+  const headParts: THREE.Object3D[] = [head, muzzle];
   cow.add(body, shoulder, neck, head, muzzle);
   // Staggered, slightly tapered legs give the animal a stable natural stance.
   for (const [legX, legZ, kneeX] of [[-0.35, -0.52, -0.03], [0.35, -0.52, 0.03], [-0.36, 0.48, 0.025], [0.36, 0.48, -0.025]]) {
@@ -513,6 +515,7 @@ for (const [cowIndex, [x, z]] of [
     const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 6), cowMuzzle);
     horn.position.set(xOffset, 1.15, 0.92);
     horn.rotation.x = -0.75;
+    headParts.push(ear, horn);
     cow.add(ear, horn);
   }
   const tail = new THREE.Mesh(
@@ -547,13 +550,24 @@ for (const [cowIndex, [x, z]] of [
   const facePatch = new THREE.Mesh(new THREE.CircleGeometry(0.11, 8), cowBlack);
   facePatch.position.set(cowIndex % 2 ? -0.1 : 0.1, 0.93, 1.265);
   facePatch.scale.set(0.75, 1, 0.18);
+  headParts.push(facePatch);
   cow.add(facePatch);
   cow.position.set(x, yWorld(x, z), z);
   cow.rotation.y = Math.random() * Math.PI;
+  cow.userData.grazeParts = headParts.map((part) => ({
+    part,
+    y: part.position.y,
+    z: part.position.z,
+  }));
+  cow.userData.target = new THREE.Vector2(x, z);
+  cow.userData.state = "grazing";
+  cow.userData.stateTimer = 1 + Math.random() * 4;
+  cow.userData.speed = 0.28 + Math.random() * 0.12;
   cow.traverse((o) => {
     if (o instanceof THREE.Mesh) o.castShadow = true;
   });
   scene.add(cow);
+  cattle.push(cow);
 }
 // Dense woodland occupies the west of the valley.
 for (let x = -27; x <= -14; x += 1.5)
@@ -1342,10 +1356,80 @@ renderer.domElement.addEventListener(
   { passive: true },
 );
 const clock = new THREE.Clock();
+function chooseGrazingSpot(cow: THREE.Group) {
+  // Keep the cows clear of the fence while giving each a different patch of grass.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = new THREE.Vector2(
+      5.8 + Math.random() * 8.3,
+      3.8 + Math.random() * 6.5,
+    );
+    if (
+      cattle.every(
+        (other) =>
+          other === cow ||
+          candidate.distanceTo(new THREE.Vector2(other.position.x, other.position.z)) > 1.15,
+      )
+    ) {
+      cow.userData.target = candidate;
+      return;
+    }
+  }
+  cow.userData.target = new THREE.Vector2(
+    5.8 + Math.random() * 8.3,
+    3.8 + Math.random() * 6.5,
+  );
+}
+function updateCattle(dt: number, time: number) {
+  cattle.forEach((cow, index) => {
+    const grazeParts = cow.userData.grazeParts as {
+      part: THREE.Object3D;
+      y: number;
+      z: number;
+    }[];
+    cow.userData.stateTimer -= dt;
+    if (cow.userData.state === "grazing") {
+      const headLowering = 0.2 + Math.sin(time * 2.2 + index) * 0.025;
+      grazeParts.forEach(({ part, y, z }) => {
+        part.position.y = THREE.MathUtils.lerp(part.position.y, y - headLowering, dt * 6);
+        part.position.z = THREE.MathUtils.lerp(part.position.z, z + 0.08, dt * 6);
+      });
+      if (cow.userData.stateTimer <= 0) {
+        chooseGrazingSpot(cow);
+        cow.userData.state = "walking";
+        cow.userData.stateTimer = 10 + Math.random() * 8;
+      }
+      return;
+    }
+    grazeParts.forEach(({ part, y, z }) => {
+      part.position.y = THREE.MathUtils.lerp(part.position.y, y, dt * 6);
+      part.position.z = THREE.MathUtils.lerp(part.position.z, z, dt * 6);
+    });
+    const target = cow.userData.target as THREE.Vector2;
+    const dx = target.x - cow.position.x,
+      dz = target.y - cow.position.z,
+      distance = Math.hypot(dx, dz);
+    if (distance < 0.12 || cow.userData.stateTimer <= 0) {
+      cow.userData.state = "grazing";
+      cow.userData.stateTimer = 3 + Math.random() * 5;
+      return;
+    }
+    const heading = Math.atan2(dx, dz);
+    const turn = THREE.MathUtils.euclideanModulo(
+      heading - cow.rotation.y + Math.PI,
+      Math.PI * 2,
+    ) - Math.PI;
+    cow.rotation.y += turn * Math.min(1, dt * 2.5);
+    const step = Math.min(distance, cow.userData.speed * dt);
+    cow.position.x += (dx / distance) * step;
+    cow.position.z += (dz / distance) * step;
+    cow.position.y = yWorld(cow.position.x, cow.position.z);
+  });
+}
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
   const speed = keys.has("ShiftLeft") ? 10 : 5;
+  updateCattle(dt, t);
   let dx = 0,
     dz = 0;
   if (keys.has("ArrowUp")) dz -= 1;
