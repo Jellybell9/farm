@@ -1729,6 +1729,10 @@ function buyMarketItem(kind: MarketItem) {
     replaceFarmVehicle(kind);
   } else if (kind === "vegetables") {
     pendingVegetablePlot = true;
+    // Close and unfocus the shop so keyboard movement immediately returns to
+    // the farmer while the player chooses a placement location.
+    marketplace.hidden = true;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     refreshFarm();
     marketNote.textContent = "Face an open spot and press F to place your vegetable plot.";
     toast.textContent = "Vegetable plot ready. Walk to the desired spot, face it, and press F.";
