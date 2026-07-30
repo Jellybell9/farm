@@ -1284,74 +1284,103 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   const coat = new THREE.MeshStandardMaterial({ color: colors[kind], roughness: 0.9 });
   const dark = new THREE.MeshStandardMaterial({ color: kind === "pig" ? 0xc77278 : 0x38261e });
   const horse = kind === "horse";
+  const headBaseY = horse ? 1.34 : 0.72;
+  const headBaseZ = horse ? 0.75 : 0.36;
   const body = new THREE.Mesh(new THREE.SphereGeometry(horse ? 0.55 : 0.42, 12, 9), coat);
   body.position.y = horse ? 0.98 : 0.65;
   body.scale.set(horse ? 1.02 : 1.1, horse ? 0.92 : 0.8, horse ? 1.82 : 1.3);
   const head = new THREE.Mesh(new THREE.SphereGeometry(horse ? 0.3 : 0.22, 10, 8), coat);
-  head.position.set(0, horse ? 1.68 : 0.84, horse ? 1.12 : 0.53);
+  head.position.set(0, horse ? 0.34 : 0.12, horse ? 0.37 : 0.17);
   const snout = new THREE.Mesh(new THREE.SphereGeometry(kind === "pig" ? 0.13 : 0.08, 8, 6), dark);
-  snout.position.set(0, horse ? 1.57 : 0.82, horse ? 1.4 : 0.75);
-  animal.add(body, head, snout);
+  snout.position.set(0, horse ? 0.23 : 0.1, horse ? 0.65 : 0.39);
+  const headPivot = new THREE.Group();
+  headPivot.position.set(0, headBaseY, headBaseZ);
+  headPivot.add(head, snout);
+  animal.add(body, headPivot);
+  const animalLegs: THREE.Group[] = [];
   for (const [x, z] of horse
     ? [[-0.36, -0.55], [0.36, -0.55], [-0.36, 0.55], [0.36, 0.55]]
     : [[-0.28, -0.38], [0.28, -0.38], [-0.28, 0.38], [0.28, 0.38]]) {
     const legHeight = horse ? 0.92 : 0.43;
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(horse ? 0.13 : 0.11, legHeight, horse ? 0.13 : 0.11), dark);
-    leg.position.set(x, legHeight / 2, z);
+    const leg = new THREE.Group();
+    leg.position.set(x, legHeight, z);
+    const lowerLeg = new THREE.Mesh(
+      new THREE.BoxGeometry(horse ? 0.13 : 0.11, legHeight, horse ? 0.13 : 0.11),
+      dark,
+    );
+    lowerLeg.position.y = -legHeight / 2;
+    leg.add(lowerLeg);
     animal.add(leg);
+    animalLegs.push(leg);
     if (horse) {
-      const hoof = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.12, 0.19), dark);
-      hoof.material = new THREE.MeshStandardMaterial({ color: 0x171311, roughness: 1 });
-      hoof.position.set(x, 0.05, z + (z > 0 ? 0.025 : -0.025));
-      animal.add(hoof);
+      const hoof = new THREE.Mesh(
+        new THREE.BoxGeometry(0.17, 0.12, 0.19),
+        new THREE.MeshStandardMaterial({ color: 0x171311, roughness: 1 }),
+      );
+      hoof.position.set(0, -legHeight + 0.05, z > 0 ? 0.025 : -0.025);
+      leg.add(hoof);
     }
   }
   if (horse) {
-    // Give the horse a recognizable silhouette instead of the generic farm-animal body.
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.64, 10), coat);
-    neck.position.set(0, 1.38, 0.77);
-    neck.rotation.x = -0.48;
-    animal.add(neck);
-
     for (const x of [-0.14, 0.14]) {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.25, 8), coat);
-      ear.position.set(x, 1.98, 1.07);
+      ear.position.set(x, 0.64, 0.32);
       ear.rotation.x = -0.12;
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), dark);
-      eye.position.set(x * 1.55, 1.75, 1.28);
-      animal.add(ear, eye);
+      eye.position.set(x * 1.55, 0.41, 0.53);
+      headPivot.add(ear, eye);
     }
     const blaze = new THREE.Mesh(
       new THREE.SphereGeometry(0.075, 8, 6),
       new THREE.MeshStandardMaterial({ color: 0xf0dfbf, roughness: 0.9 }),
     );
-    blaze.position.set(0, 1.72, 1.38);
+    blaze.position.set(0, 0.38, 0.63);
     blaze.scale.set(0.65, 1.7, 0.18);
-    animal.add(blaze);
+    headPivot.add(blaze);
 
-    const mane = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 1 });
-    for (let segment = 0; segment < 6; segment++) {
-      const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.22, 0.18), mane);
-      tuft.position.set(0, 1.45 - segment * 0.04, 0.7 - segment * 0.22);
-      tuft.rotation.x = -0.28;
-      animal.add(tuft);
+    const hair = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 1 });
+    const maneGroup = new THREE.Group();
+    for (const offset of [-0.09, -0.045, 0, 0.045, 0.09]) {
+      const maneStrand = new THREE.Mesh(
+        new THREE.TubeGeometry(
+          new THREE.CatmullRomCurve3([
+            new THREE.Vector3(offset, 1.82, 0.95),
+            new THREE.Vector3(offset * 1.45, 1.72, 0.5),
+            new THREE.Vector3(offset * 2.1, 1.52, -0.08),
+            new THREE.Vector3(offset * 2.8, 1.34, -0.5),
+          ]),
+          14,
+          0.028,
+          6,
+          false,
+        ),
+        hair,
+      );
+      maneGroup.add(maneStrand);
     }
-    const tail = new THREE.Mesh(
-      new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3([
-          new THREE.Vector3(0, 1.2, -1.02),
-          new THREE.Vector3(0.04, 0.9, -1.34),
-          new THREE.Vector3(-0.12, 0.48, -1.38),
-          new THREE.Vector3(-0.04, 0.28, -1.2),
-        ]),
-        12,
-        0.045,
-        6,
-        false,
-      ),
-      mane,
-    );
-    animal.add(tail);
+    animal.add(maneGroup);
+    const tailGroup = new THREE.Group();
+    for (const offset of [-0.1, -0.05, 0, 0.05, 0.1]) {
+      const tailStrand = new THREE.Mesh(
+        new THREE.TubeGeometry(
+          new THREE.CatmullRomCurve3([
+            new THREE.Vector3(offset * 0.45, 1.2, -1.02),
+            new THREE.Vector3(offset, 0.92, -1.36),
+            new THREE.Vector3(offset * 1.8, 0.52, -1.48),
+            new THREE.Vector3(offset * 2.4, 0.25, -1.22),
+          ]),
+          14,
+          0.035,
+          6,
+          false,
+        ),
+        hair,
+      );
+      tailGroup.add(tailStrand);
+    }
+    animal.add(tailGroup);
+    animal.userData.mane = maneGroup;
+    animal.userData.tail = tailGroup;
   }
   if (kind === "sheep") {
     for (const [x, z] of [[-0.24, -0.15], [0.24, -0.15], [-0.24, 0.2], [0.24, 0.2]]) {
@@ -1364,24 +1393,24 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
     snout.material = face;
     for (const side of [-1, 1]) {
       const ear = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), face);
-      ear.position.set(side * 0.18, 0.96, 0.5);
+      ear.position.set(side * 0.18, 0.24, 0.14);
       ear.scale.set(1, 0.35, 0.8);
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), dark);
-      eye.position.set(side * 0.18, 0.9, 0.65);
-      animal.add(ear, eye);
+      eye.position.set(side * 0.18, 0.18, 0.29);
+      headPivot.add(ear, eye);
     }
   } else if (kind === "pig") {
     const innerEar = new THREE.MeshStandardMaterial({ color: 0xd57982, roughness: 0.95 });
     const pigEye = new THREE.MeshStandardMaterial({ color: 0x251a1b, roughness: 0.8 });
     for (const side of [-1, 1]) {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.24, 6), innerEar);
-      ear.position.set(side * 0.18, 1.07, 0.45);
+      ear.position.set(side * 0.18, 0.35, 0.09);
       ear.rotation.z = side * 0.36;
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), pigEye);
-      eye.position.set(side * 0.19, 0.91, 0.64);
+      eye.position.set(side * 0.19, 0.19, 0.28);
       const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 5), pigEye);
-      nostril.position.set(side * 0.055, 0.82, 0.75);
-      animal.add(ear, eye, nostril);
+      nostril.position.set(side * 0.055, 0.1, 0.39);
+      headPivot.add(ear, eye, nostril);
     }
     const curlyTail = new THREE.Mesh(
       new THREE.TorusGeometry(0.12, 0.025, 6, 10, Math.PI * 1.5),
@@ -1399,7 +1428,8 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   animal.position.set(x, yWorld(x, z), z);
   animal.rotation.y = kind === "horse" ? Math.PI / 2 : (slot % 2) * Math.PI;
   animal.userData.kind = kind;
-  animal.userData.head = head;
+  animal.userData.head = headPivot;
+  animal.userData.legs = animalLegs;
   animal.userData.target = new THREE.Vector2(x, z);
   animal.userData.state = "grazing";
   animal.userData.stateTimer = 1.5 + Math.random() * 3;
@@ -2369,16 +2399,28 @@ function chooseMarketAnimalSpot(animal: THREE.Group) {
     pasture.minZ + 1.2 + Math.random() * (pasture.maxZ - pasture.minZ - 2.4),
   );
 }
+function animateMarketAnimalLegs(legs: THREE.Group[], stride: number, amount: number) {
+  legs.forEach((leg, index) => {
+    const diagonal = index === 0 || index === 3 ? 1 : -1;
+    leg.rotation.x = stride * diagonal * amount;
+  });
+}
 function updateMarketAnimals(dt: number, time: number) {
   marketAnimals.forEach((animal, index) => {
-    const head = animal.userData.head as THREE.Mesh;
+    const head = animal.userData.head as THREE.Object3D;
+    const legs = animal.userData.legs as THREE.Group[];
+    const mane = animal.userData.mane as THREE.Group | undefined;
+    const tail = animal.userData.tail as THREE.Group | undefined;
     animal.userData.stateTimer -= dt;
     if (animal.userData.state === "grazing") {
       head.rotation.x = THREE.MathUtils.lerp(
         head.rotation.x,
-        0.28 + Math.sin(time * 2.4 + index) * 0.06,
+        0.62 + Math.sin(time * 2.4 + index) * 0.1,
         Math.min(1, dt * 4),
       );
+      animateMarketAnimalLegs(legs, 0, 0);
+      if (tail) tail.rotation.y = Math.sin(time * 1.8 + index) * 0.14;
+      if (mane) mane.rotation.z = Math.sin(time * 1.4 + index) * 0.025;
       if (animal.userData.stateTimer <= 0) {
         chooseMarketAnimalSpot(animal);
         animal.userData.state = "walking";
@@ -2406,6 +2448,10 @@ function updateMarketAnimals(dt: number, time: number) {
     animal.position.z += (dz / distance) * step;
     animal.position.y = yWorld(animal.position.x, animal.position.z);
     head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0, Math.min(1, dt * 6));
+    const stride = Math.sin(time * 11 + index * 1.7);
+    animateMarketAnimalLegs(legs, stride, animal.userData.kind === "horse" ? 0.55 : 0.4);
+    if (tail) tail.rotation.y = Math.sin(time * 7 + index) * 0.22;
+    if (mane) mane.rotation.z = Math.sin(time * 7 + index) * 0.045;
   });
 }
 function loop() {
