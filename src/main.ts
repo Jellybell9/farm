@@ -16,6 +16,10 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
   "afterend",
   `<div>Milk <b id="milk">0</b></div><div>Vegetables <b id="vegetables">0 fridge</b></div><div>Pig meals <b id="pigMeals">0 / 0</b></div><div>New farm stock <b id="farmStock">0</b></div>`,
 );
+document.querySelector("#care")!.parentElement!.insertAdjacentHTML(
+  "afterend",
+  `<div>Farmer health <b id="health">100%</b></div>`,
+);
 document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
   `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><p class="market-section">FARM DEFENSE</p><div class="market-items"><button class="market-item" data-buy="rifle"><span><b>Rifle</b><small>Press Q to protect livestock</small></span><em>300</em></button></div><small class="market-note" id="marketNote">Build your farm or upgrade your equipment.</small>`,
@@ -44,6 +48,8 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 document.querySelectorAll<HTMLElement>("#helpPanel section span")[2]!.textContent =
   "Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. To sell a bale, place it next to another bale anywhere on the farm; chilled milk can be sold directly.";
+document.querySelectorAll<HTMLElement>("#helpPanel section span")[5]!.textContent =
+  "Day lasts 20 minutes, then night lasts 5 minutes. Wolves live in the forest and a bear lives in the mountains. Keep your distance: if a wild animal reaches you, it attacks until you escape or use your rifle. Too much damage restarts the farm.";
 
 const scene = new THREE.Scene();
 const daySky = new THREE.Color(0x87c7db);
@@ -1456,6 +1462,8 @@ let vy = 0,
   fedBales = 0,
   coins = 0,
   dayElapsed = 0,
+  farmerHealth = 100,
+  farmerDefeated = false,
   storedBales = 0,
   sheep = 0,
   pigs = 0,
@@ -1653,6 +1661,7 @@ const toast = document.querySelector("#toast")!,
   fedBalesLabel = document.querySelector("#fedBales")!,
   coinsLabel = document.querySelector("#coins")!,
   farmStockLabel = document.querySelector("#farmStock")!,
+  farmerHealthLabel = document.querySelector("#health")!,
   dayTimerLabel = document.querySelector("#dayTimer")!,
   storedLabel = document.querySelector("#stored")!,
   milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!,
@@ -1673,6 +1682,7 @@ function refreshFarm() {
   balesLabel.textContent = String(bales);
   fedBalesLabel.textContent = `${fedBales} / 3`;
   coinsLabel.textContent = String(coins);
+  farmerHealthLabel.textContent = `${Math.ceil(farmerHealth)}%`;
   farmStockLabel.textContent = String(sheep + pigs + vegetablePlots + horses);
   storedLabel.textContent = String(baleObjects.filter(isBaleInSellingStack).length);
   shardLabel.textContent = String(shardCount);
@@ -3585,6 +3595,21 @@ function removeLivestock(prey: THREE.Group, predator: THREE.Group) {
   refreshFarm();
   toast.textContent = `A ${predator.userData.kind} attacked and killed livestock in the pasture!`;
 }
+function damageFarmer(amount: number, attacker: THREE.Group) {
+  if (farmerDefeated) return;
+  farmerHealth = Math.max(0, farmerHealth - amount);
+  refreshFarm();
+  if (!attacker.userData.attackingFarmer) {
+    attacker.userData.attackingFarmer = true;
+    toast.textContent = `The ${attacker.userData.kind} attacks! Get away or use your rifle.`;
+  }
+  if (farmerHealth > 0) return;
+  farmerDefeated = true;
+  gameStarted = false;
+  keys.clear();
+  toast.textContent = "The wild animal overwhelmed the farmer. Restarting the farm...";
+  setTimeout(() => window.location.reload(), 1800);
+}
 function updateWildAnimals(dt: number, time: number) {
   const night = dayElapsed >= DAY_LENGTH_SECONDS;
   wildAnimals.forEach((animal, index) => {
@@ -3604,7 +3629,24 @@ function updateWildAnimals(dt: number, time: number) {
     const head = animal.userData.head as THREE.Object3D;
     const tail = animal.userData.tail as THREE.Object3D;
     let target = animal.userData.target as THREE.Vector2;
-    if (!night) {
+    const playerDistance = Math.hypot(
+      animal.position.x - hero.position.x,
+      animal.position.z - hero.position.z,
+    );
+    if (playerDistance < 8) {
+      target = new THREE.Vector2(hero.position.x, hero.position.z);
+      animal.userData.prey = undefined;
+      animal.userData.attackTime = 0;
+      if (playerDistance < 1.2) {
+        damageFarmer(dt * (animal.userData.kind === "bear" ? 26 : 16), animal);
+        animateWildLegs(legs, 0, 0);
+        head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, -0.3, Math.min(1, dt * 6));
+        tail.rotation.y = Math.sin(time * 8 + index) * 0.3;
+        return;
+      }
+      animal.userData.attackingFarmer = false;
+    } else if (!night) {
+      animal.userData.attackingFarmer = false;
       animal.userData.killsTonight = 0;
       animal.userData.prey = undefined;
       animal.userData.attackTime = 0;
@@ -3615,6 +3657,7 @@ function updateWildAnimals(dt: number, time: number) {
         animal.userData.roamTimer = 5 + Math.random() * 9;
       }
     } else if ((animal.userData.killsTonight as number) < 1) {
+      animal.userData.attackingFarmer = false;
       const livestock = [
         ...cattle,
         ...marketAnimals.filter((animal) => !animal.userData.ridden),
