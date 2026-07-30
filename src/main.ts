@@ -2817,7 +2817,7 @@ function growWheat(now: number) {
           scene.remove(drop.mesh);
           fallenWheat.splice(i, 1);
           looseStraw++;
-          const sheavesPerBale = fastBaler ? 2 : 3;
+          const sheavesPerBale = fastBaler ? 2 : 5;
           toast.textContent = `Tractor collected wheat (${looseStraw}/${sheavesPerBale}).`;
           if (looseStraw >= sheavesPerBale) {
             looseStraw = 0;
