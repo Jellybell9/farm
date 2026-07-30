@@ -9,7 +9,7 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
   "afterend",
-  `<div>Milk <b id="milk">0</b></div><div>New farm stock <b id="farmStock">0</b></div>`,
+  `<div>Milk <b id="milk">0</b></div><div>Vegetables <b id="vegetables">0 fridge</b></div><div>Pig meals <b id="pigMeals">0 / 0</b></div><div>New farm stock <b id="farmStock">0</b></div>`,
 );
 document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
@@ -1281,6 +1281,7 @@ let vy = 0,
   wheat = 0,
   milk = 0,
   chilledMilk = 0,
+  fridgeVegetables = 0,
   cattleCare = 50,
   ripePlots = 45,
   farmDay = 1,
@@ -1362,6 +1363,8 @@ const toast = document.querySelector("#toast")!,
   location = document.querySelector("#location")!,
   wheatLabel = document.querySelector("#wheat")!,
   milkLabel = document.querySelector("#milk")!,
+  vegetablesLabel = document.querySelector("#vegetables")!,
+  pigMealsLabel = document.querySelector("#pigMeals")!,
   careLabel = document.querySelector("#care")!,
   plotsLabel = document.querySelector("#plots")!,
   balesLabel = document.querySelector("#bales")!,
@@ -1374,6 +1377,11 @@ const toast = document.querySelector("#toast")!,
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
+  vegetablesLabel.textContent = `${fridgeVegetables} fridge`;
+  const fedPigs = marketAnimals.filter(
+    (animal) => animal.userData.kind === "pig" && animal.userData.fedDay === farmDay,
+  ).length;
+  pigMealsLabel.textContent = `${fedPigs} / ${pigs}`;
   careLabel.textContent = `${cattleCare}%`;
   plotsLabel.textContent = String(ripePlots);
   balesLabel.textContent = String(bales);
@@ -1403,6 +1411,7 @@ const marketNote = document.querySelector("#marketNote")!;
 const marketAnimals: THREE.Group[] = [];
 const deliveredVehicles = new Set<VehicleMarketItem>();
 const vegetablePlotPositions: THREE.Vector2[] = [];
+const vegetableGardens: THREE.Group[] = [];
 
 function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   const animal = new THREE.Group();
@@ -1578,19 +1587,61 @@ function addVegetablePlot(x: number, z: number) {
   const leaf = new THREE.MeshStandardMaterial({ color: 0x4f8f3f, roughness: 0.9 });
   const carrot = new THREE.MeshStandardMaterial({ color: 0xe18132, roughness: 0.85 });
   plot.add(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.16, 1.5), soil));
+  const carrots: THREE.Mesh[] = [];
+  const leaves: THREE.Mesh[] = [];
   for (const x of [-0.65, -0.22, 0.22, 0.65])
     for (const z of [-0.35, 0.35]) {
       const vegetable = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 6), carrot);
       vegetable.position.set(x, 0.2, z);
-      const leaves = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.34, 5), leaf);
-      leaves.position.set(x, 0.42, z);
-      plot.add(vegetable, leaves);
+      const leafMesh = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.34, 5), leaf);
+      leafMesh.position.set(x, 0.42, z);
+      plot.add(vegetable, leafMesh);
+      carrots.push(vegetable);
+      leaves.push(leafMesh);
     }
   plot.position.set(x, yWorld(x, z), z);
+  plot.userData.stage = "ripe";
+  plot.userData.carrots = carrots;
+  plot.userData.leaves = leaves;
   plot.traverse((object) => {
     if (object instanceof THREE.Mesh) object.castShadow = true;
   });
   scene.add(plot);
+  vegetableGardens.push(plot);
+}
+
+function interactWithVegetablePlot() {
+  const plot = vegetableGardens.find(
+    (garden) => garden.position.distanceTo(hero.position) <= 2.2,
+  );
+  if (!plot) return false;
+  const stage = plot.userData.stage as "ripe" | "bare" | "growing";
+  const carrots = plot.userData.carrots as THREE.Mesh[];
+  const leaves = plot.userData.leaves as THREE.Mesh[];
+  if (stage === "ripe") {
+    carrots.forEach((carrot) => (carrot.visible = false));
+    leaves.forEach((leaf) => (leaf.visible = false));
+    plot.userData.stage = "bare";
+    fridgeVegetables += 4;
+    refreshFarm();
+    toast.textContent = "Harvested vegetables and stored 4 in the refrigerator.";
+    return true;
+  }
+  if (stage === "growing") {
+    toast.textContent = "These vegetables are still growing. They will ripen next day.";
+    return true;
+  }
+  if (fridgeVegetables < 1) {
+    toast.textContent = "You need one stored vegetable to plant this garden.";
+    return true;
+  }
+  fridgeVegetables--;
+  leaves.forEach((leaf) => (leaf.visible = true));
+  carrots.forEach((carrot) => (carrot.visible = false));
+  plot.userData.stage = "growing";
+  refreshFarm();
+  toast.textContent = "Vegetable seeds planted. They will ripen next day.";
+  return true;
 }
 
 function placeVegetablePlot() {
@@ -2016,6 +2067,27 @@ function farmAction() {
     return;
   }
   if (inPasture) {
+    const nearestPig = marketAnimals
+      .filter((animal) => animal.userData.kind === "pig")
+      .sort(
+        (a, b) =>
+          a.position.distanceTo(hero.position) - b.position.distanceTo(hero.position),
+      )[0];
+    if (nearestPig && nearestPig.position.distanceTo(hero.position) <= 2) {
+      if (nearestPig.userData.fedDay === farmDay) {
+        toast.textContent = "This pig has already eaten vegetables today.";
+        return;
+      }
+      if (fridgeVegetables < 1) {
+        toast.textContent = "Harvest vegetables and store them in the fridge before feeding pigs.";
+        return;
+      }
+      fridgeVegetables--;
+      nearestPig.userData.fedDay = farmDay;
+      refreshFarm();
+      toast.textContent = "The pig happily eats its daily vegetables.";
+      return;
+    }
     if (cattle.length === 0) {
       toast.textContent = "The pasture is empty. The herd did not survive.";
       return;
@@ -2170,6 +2242,8 @@ addEventListener("keydown", (e) => {
       restOnFurniture("lying");
     } else if (interactWithFridge()) {
       // The kitchen interaction takes precedence over vehicles beyond the house.
+    } else if (interactWithVegetablePlot()) {
+      // Garden plots can be harvested or replanted directly.
     } else if (hero.position.distanceTo(tractor.position) < 2.5) {
       driving = true;
       usingHarvester = false;
@@ -2258,16 +2332,35 @@ function endDay() {
     cattleCare = Math.min(100, cattleCare + 6);
     questText.textContent = "Make three more bales before the next day ends.";
   }
+  const unfedPigs = marketAnimals.filter(
+    (animal) => animal.userData.kind === "pig" && animal.userData.fedDay !== farmDay,
+  );
+  if (unfedPigs.length) {
+    const pigDeaths = Math.max(1, Math.ceil(unfedPigs.length / 2));
+    unfedPigs.slice(0, pigDeaths).forEach((pig) => {
+      marketAnimals.splice(marketAnimals.indexOf(pig), 1);
+      scene.remove(pig);
+    });
+    pigs = Math.max(0, pigs - pigDeaths);
+    dayReport = `${dayReport} ${pigDeaths} pig${pigDeaths === 1 ? "" : "s"} died after missing vegetables.`.trim();
+  }
+  let ripenedGardens = 0;
+  vegetableGardens.forEach((garden) => {
+    if (garden.userData.stage !== "growing") return;
+    garden.userData.stage = "ripe";
+    (garden.userData.carrots as THREE.Mesh[]).forEach((carrot) => (carrot.visible = true));
+    ripenedGardens++;
+  });
   farmDay++;
   ripePlots = Math.min(18, ripePlots + 6);
   cropMaturity = Math.min(1, cropMaturity + 0.35);
   fedBales = 0;
   cattle.forEach((cow) => (cow.userData.milkedToday = false));
   refreshFarm();
-  if (cattle.length > 0)
+  if (cattle.length > 0 || dayReport || ripenedGardens)
     toast.textContent = dayReport
-      ? `${dayReport} Day ${farmDay}: feed three bales to the remaining herd.`
-      : `Day ${farmDay}: feed the herd three bales before ending the day.`;
+      ? `${dayReport} Day ${farmDay}: ${ripenedGardens ? `${ripenedGardens} garden${ripenedGardens === 1 ? "" : "s"} ripened. ` : ""}Feed the herd and pigs.`
+      : `Day ${farmDay}: feed the herd and pigs before night.`;
 }
 refreshFarm();
 refreshDayTimer();
@@ -2873,17 +2966,33 @@ function loop() {
   const nearbyCow = cattle.find(
     (cow) => cow.position.distanceTo(hero.position) <= 2,
   );
+  const nearbyGarden = vegetableGardens.find(
+    (garden) => garden.position.distanceTo(hero.position) <= 2.2,
+  );
+  const nearbyPig = marketAnimals.find(
+    (animal) => animal.userData.kind === "pig" && animal.position.distanceTo(hero.position) <= 2,
+  );
   const nearFridge = refrigerator && hero.position.distanceTo(refrigerator.position) <= 2;
   const nearCouch = Math.hypot(hero.position.x - couchSpot.x, hero.position.z - couchSpot.y) <= 1.45;
   const nearBed = Math.hypot(hero.position.x - bedSpot.x, hero.position.z - bedSpot.y) <= 1.45;
   milkPrompt.hidden =
-    driving || (!nearbyCow && !nearFridge && !nearCouch && !nearBed && !resting) || Boolean(milkingCow);
+    driving || (!nearbyCow && !nearbyGarden && !nearbyPig && !nearFridge && !nearCouch && !nearBed && !resting) || Boolean(milkingCow);
   if (resting)
     milkPrompt.innerHTML = resting === "sitting" ? "PRESS <b>E</b> TO STAND" : "PRESS <b>E</b> TO GET UP";
   else if (nearCouch)
     milkPrompt.innerHTML = "PRESS <b>E</b> TO SIT ON COUCH";
   else if (nearBed)
     milkPrompt.innerHTML = "PRESS <b>E</b> TO LIE ON BED";
+  else if (nearbyGarden)
+    milkPrompt.innerHTML = nearbyGarden.userData.stage === "ripe"
+      ? "PRESS <b>E</b> TO HARVEST VEGETABLES"
+      : nearbyGarden.userData.stage === "bare"
+        ? "PRESS <b>E</b> TO PLANT VEGETABLES"
+        : "VEGETABLES ARE GROWING";
+  else if (nearbyPig)
+    milkPrompt.innerHTML = nearbyPig.userData.fedDay === farmDay
+      ? "PIG FED FOR TODAY"
+      : "PRESS <b>E</b> TO FEED PIG VEGETABLES";
   else if (nearFridge)
     milkPrompt.innerHTML = fridgeOpen
       ? hasMilkBucket
