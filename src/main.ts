@@ -728,21 +728,6 @@ fenceLine(fieldX - fieldW / 2, fieldZ - fieldD / 2, 41, false);
 fenceLine(fieldX - fieldW / 2, fieldZ - fieldD / 2, 41, true);
 fenceLine(fieldX + fieldW / 2, fieldZ - fieldD / 2, 41, true);
 fenceLine(fieldX - fieldW / 2, fieldZ + fieldD / 2, 41, false, 37);
-// Hay bales mark the field edge.
-for (const [x, z] of [
-  [-38, -38],
-  [-37.3, -38],
-  [-4, -38],
-]) {
-  const bale = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.34, 0.34, 0.65, 10),
-    hay,
-  );
-  bale.rotation.z = Math.PI / 2;
-  bale.position.set(x, yWorld(x, z) + 0.35, z);
-  bale.castShadow = true;
-  scene.add(bale);
-}
 // Pasture: a broad grass pen with room for a larger grazing herd.
 const pasture = { minX: 5, maxX: 24.8, minZ: 3, maxZ: 16.5 };
 fenceLine(pasture.minX, pasture.minZ, 23, false, 7);
