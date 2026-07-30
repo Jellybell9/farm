@@ -2514,6 +2514,8 @@ function updateMarketAnimals(dt: number, time: number) {
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
+  const airborne =
+    !driving && hero.position.y > playerGroundY(hero.position.x, hero.position.z) + 0.06;
   const speed = driving
     ? tractorEngine
       ? 9
@@ -2610,13 +2612,17 @@ function loop() {
     // make the arrow keys suddenly point in unrelated world directions.
     const moveX = dx * Math.cos(orbitYaw) + dz * Math.sin(orbitYaw);
     const moveZ = -dx * Math.sin(orbitYaw) + dz * Math.cos(orbitYaw);
-    const stepX = moveX * speed * dt,
-      stepZ = moveZ * speed * dt;
+    // A jump keeps a little directional control, but covers far less ground
+    // than running and can clear a narrow low obstacle.
+    const airControlSpeed = airborne ? 2.1 : speed;
+    const collisionRadius = airborne ? 0 : 0.32;
+    const stepX = moveX * airControlSpeed * dt,
+      stepZ = moveZ * airControlSpeed * dt;
     // Resolve each axis separately so the farmer naturally slides along walls
     // and trunks instead of clipping through them or stopping completely.
-    if (canStandAt(hero.position.x + stepX, hero.position.z))
+    if (canStandAt(hero.position.x + stepX, hero.position.z, collisionRadius))
       hero.position.x += stepX;
-    if (canStandAt(hero.position.x, hero.position.z + stepZ))
+    if (canStandAt(hero.position.x, hero.position.z + stepZ, collisionRadius))
       hero.position.z += stepZ;
     hero.rotation.y = Math.atan2(-moveX, -moveZ);
     coat.position.y = 0.7 + Math.sin(t * 15) * 0.05;
