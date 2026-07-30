@@ -27,8 +27,11 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87c7db);
-scene.fog = new THREE.FogExp2(0x87c7db, 0.012);
+const daySky = new THREE.Color(0x87c7db);
+const nightSky = new THREE.Color(0x071226);
+const skyColor = daySky.clone();
+scene.background = skyColor;
+scene.fog = new THREE.FogExp2(skyColor, 0.012);
 const camera = new THREE.PerspectiveCamera(
   57,
   innerWidth / innerHeight,
@@ -40,12 +43,43 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 app.prepend(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xdaf2ff, 0x355a55, 2.2));
+const skyLight = new THREE.HemisphereLight(0xdaf2ff, 0x355a55, 2.2);
+scene.add(skyLight);
 const sun = new THREE.DirectionalLight(0xffecae, 3);
 sun.position.set(-18, 30, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 scene.add(sun);
+const moonLight = new THREE.DirectionalLight(0xaac8ff, 0);
+moonLight.position.set(-28, 32, -38);
+scene.add(moonLight);
+const moon = new THREE.Mesh(
+  new THREE.SphereGeometry(1.25, 16, 12),
+  new THREE.MeshBasicMaterial({ color: 0xf1f4dc, fog: false }),
+);
+moon.position.set(-30, 28, -48);
+moon.visible = false;
+scene.add(moon);
+const starPositions: number[] = [];
+for (let star = 0; star < 220; star++) {
+  starPositions.push(
+    (Math.random() - 0.5) * 170,
+    18 + Math.random() * 70,
+    (Math.random() - 0.5) * 170,
+  );
+}
+const starGeometry = new THREE.BufferGeometry();
+starGeometry.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
+const starMaterial = new THREE.PointsMaterial({
+  color: 0xf7f2d3,
+  size: 0.55,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  fog: false,
+});
+const stars = new THREE.Points(starGeometry, starMaterial);
+scene.add(stars);
 const water = new THREE.Mesh(
   new THREE.PlaneGeometry(260, 260),
   new THREE.MeshStandardMaterial({
@@ -1218,6 +1252,8 @@ function standUp() {
   toast.textContent = "The farmer stands up.";
 }
 const DAY_LENGTH_SECONDS = 20 * 60;
+const NIGHT_LENGTH_SECONDS = 5 * 60;
+const FULL_CYCLE_SECONDS = DAY_LENGTH_SECONDS + NIGHT_LENGTH_SECONDS;
 let carriedBale: THREE.Mesh | null = null,
   lastDroppedBale: THREE.Mesh | null = null;
 const baleObjects: THREE.Mesh[] = [],
@@ -1565,10 +1601,29 @@ function buyMarketItem(kind: MarketItem) {
   toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" ? "the" : "a"} ${offer.label} for ${offer.price} coins.`;
 }
 function refreshDayTimer() {
-  const remaining = Math.max(0, Math.ceil(DAY_LENGTH_SECONDS - dayElapsed));
-  dayTimerLabel.textContent = `${Math.floor(remaining / 60)}:${String(
+  const night = dayElapsed >= DAY_LENGTH_SECONDS;
+  const remaining = Math.max(
+    0,
+    Math.ceil((night ? FULL_CYCLE_SECONDS : DAY_LENGTH_SECONDS) - dayElapsed),
+  );
+  dayTimerLabel.textContent = `${night ? "NIGHT" : "DAY"} ${Math.floor(remaining / 60)}:${String(
     remaining % 60,
   ).padStart(2, "0")}`;
+}
+function updateSky(dt: number) {
+  const nightBlend = THREE.MathUtils.clamp(
+    (dayElapsed - (DAY_LENGTH_SECONDS - 45)) / 45,
+    0,
+    1,
+  );
+  skyColor.copy(daySky).lerp(nightSky, nightBlend);
+  (scene.fog as THREE.FogExp2).color.copy(skyColor);
+  skyLight.intensity = THREE.MathUtils.lerp(2.2, 0.28, nightBlend);
+  sun.intensity = THREE.MathUtils.lerp(3, 0.08, nightBlend);
+  moonLight.intensity = THREE.MathUtils.lerp(0, 1.15, nightBlend);
+  moon.visible = nightBlend > 0.01;
+  starMaterial.opacity = nightBlend;
+  stars.rotation.y += dt * 0.006;
 }
 function feedHerdBale(bale: THREE.Mesh) {
   if (cattle.length === 0 || fedBales >= 3) return false;
@@ -2558,12 +2613,16 @@ function loop() {
     : keys.has("ShiftLeft")
       ? 10
       : 5;
+  const wasNight = dayElapsed >= DAY_LENGTH_SECONDS;
   dayElapsed += dt;
-  if (dayElapsed >= DAY_LENGTH_SECONDS) {
-    dayElapsed -= DAY_LENGTH_SECONDS;
+  if (!wasNight && dayElapsed >= DAY_LENGTH_SECONDS)
+    toast.textContent = "Night has fallen. The next day begins in five minutes.";
+  if (dayElapsed >= FULL_CYCLE_SECONDS) {
+    dayElapsed -= FULL_CYCLE_SECONDS;
     endDay();
   }
   refreshDayTimer();
+  updateSky(dt);
   updateCattle(dt, t);
   updateMarketAnimals(dt, t);
   const nearbyCow = cattle.find(
