@@ -23,6 +23,10 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
+  `<button class="save-button" id="saveButton">SAVE GAME</button>`,
+);
+document.querySelector(".ui")!.insertAdjacentHTML(
+  "beforeend",
   `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Move and interact</b><span>Use Arrow keys to move and drag to look around. Hold Shift to sprint. Press Space to jump; you can steer a little in the air. Press E to interact, enter a vehicle, milk, harvest, plant, or feed animals. Press P to pick up the milk pail. F places a pending vegetable plot, or drops a bale while driving the blue loader.</span></section><section><b>Make and feed bales</b><span>Drive the orange combine through ripe wheat. Drive the green tractor over fallen sheaves; every few sheaves make a bale. Use the blue loader to pick up a bale, then place it in the pasture. Cows, sheep, and horses share pasture bales; pigs do not eat them. Feed three bales daily to protect the cattle.</span></section><section><b>Milk and sell</b><span>Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. Marketplace sells loose bales and chilled milk for coins.</span></section><section><b>Vegetables and pigs</b><span>Buy a vegetable plot, walk to clear ground, face the spot, and press F. At a plot, press E to harvest ripe vegetables; four go straight into the fridge. Press E again on an empty plot to plant it, using one stored vegetable. It ripens next day. Feed every pig one fridge vegetable each day with E or some unfed pigs die.</span></section><section><b>Marketplace upgrades</b><span>Buy animals and vegetable plots under Build Your Farm. Equipment Upgrades improve existing machinery: the wide header cuts more wheat, the power baler uses fewer sheaves, and the tractor engine makes farm vehicles faster.</span></section><section><b>Day, night, and danger</b><span>Day lasts 20 minutes, then night lasts 5 minutes. Watch the DAY/NIGHT timer. Wolves live in the forest and a bear lives in the mountains. At night they hunt pasture livestock, so keep an eye on the herd.</span></section></aside>`,
 );
 
@@ -1461,7 +1465,8 @@ const toast = document.querySelector("#toast")!,
   farmStockLabel = document.querySelector("#farmStock")!,
   dayTimerLabel = document.querySelector("#dayTimer")!,
   storedLabel = document.querySelector("#stored")!,
-  milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!;
+  milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!,
+  saveButton = document.querySelector<HTMLButtonElement>("#saveButton")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
@@ -2515,6 +2520,146 @@ function endDay() {
       ? `${dayReport} Day ${farmDay}: ${ripenedGardens ? `${ripenedGardens} garden${ripenedGardens === 1 ? "" : "s"} ripened. ` : ""}Feed the herd and pigs.`
       : `Day ${farmDay}: feed the herd and pigs before night.`;
 }
+const SAVE_KEY = "greenacre-farm-save-v1";
+type SavedAnimal = {
+  kind: "sheep" | "pig" | "horse";
+  x: number;
+  y: number;
+  z: number;
+  rotation: number;
+  fedDay?: number;
+};
+function saveGame() {
+  const save = {
+    version: 1,
+    hero: { x: hero.position.x, y: hero.position.y, z: hero.position.z, rotation: hero.rotation.y },
+    supplies: {
+      shardCount, wheat, milk, chilledMilk, fridgeVegetables, carriedVegetables,
+      carryingFridgeVegetable, cattleCare, ripePlots, farmDay, cropMaturity,
+      fedBales, coins, dayElapsed, storedBales, sheep, pigs, vegetablePlots, horses,
+      cattleCount: cattle.length,
+      wideHeader, fastBaler, tractorEngine,
+    },
+    animals: marketAnimals.map((animal): SavedAnimal => ({
+      kind: animal.userData.kind,
+      x: animal.position.x,
+      y: animal.position.y,
+      z: animal.position.z,
+      rotation: animal.rotation.y,
+      fedDay: animal.userData.fedDay,
+    })),
+    gardens: vegetableGardens.map((garden) => ({
+      x: garden.position.x,
+      z: garden.position.z,
+      stage: garden.userData.stage,
+    })),
+    deliveredVehicles: [...deliveredVehicles],
+    vehicles: [tractor, harvester, planter, loader].map((vehicle) => ({
+      x: vehicle.position.x,
+      y: vehicle.position.y,
+      z: vehicle.position.z,
+      rotation: vehicle.rotation.y,
+    })),
+  };
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    toast.textContent = "Progress saved in this browser.";
+  } catch {
+    toast.textContent = "This browser could not save progress.";
+  }
+}
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const save = JSON.parse(raw) as {
+      hero?: { x: number; y: number; z: number; rotation: number };
+      supplies?: Record<string, unknown>;
+      animals?: SavedAnimal[];
+      gardens?: { x: number; z: number; stage: "ripe" | "bare" | "growing" }[];
+      deliveredVehicles?: VehicleMarketItem[];
+      vehicles?: { x: number; y: number; z: number; rotation: number }[];
+    };
+    if (save.supplies) {
+      const supplies = save.supplies;
+      const number = (name: string, fallback: number) =>
+        typeof supplies[name] === "number" ? supplies[name] as number : fallback;
+      shardCount = number("shardCount", shardCount);
+      wheat = number("wheat", wheat);
+      milk = number("milk", milk);
+      chilledMilk = number("chilledMilk", chilledMilk);
+      fridgeVegetables = number("fridgeVegetables", fridgeVegetables);
+      carriedVegetables = number("carriedVegetables", carriedVegetables);
+      cattleCare = number("cattleCare", cattleCare);
+      ripePlots = number("ripePlots", ripePlots);
+      farmDay = number("farmDay", farmDay);
+      cropMaturity = number("cropMaturity", cropMaturity);
+      fedBales = number("fedBales", fedBales);
+      coins = number("coins", coins);
+      dayElapsed = number("dayElapsed", dayElapsed);
+      storedBales = number("storedBales", storedBales);
+      sheep = number("sheep", sheep);
+      pigs = number("pigs", pigs);
+      vegetablePlots = number("vegetablePlots", vegetablePlots);
+      horses = number("horses", horses);
+      const cattleCount = number("cattleCount", cattle.length);
+      while (cattle.length > cattleCount) scene.remove(cattle.pop()!);
+      carryingFridgeVegetable = supplies.carryingFridgeVegetable === true;
+      wideHeader = supplies.wideHeader === true;
+      fastBaler = supplies.fastBaler === true;
+      tractorEngine = supplies.tractorEngine === true;
+      cutter.scale.x = wideHeader ? 1.7 : 1;
+    }
+    if (save.hero) {
+      hero.position.set(save.hero.x, save.hero.y, save.hero.z);
+      hero.rotation.y = save.hero.rotation;
+    }
+    marketAnimals.splice(0).forEach((animal) => scene.remove(animal));
+    (save.animals ?? []).forEach((savedAnimal, index) => {
+      addMarketAnimal(savedAnimal.kind, index + 1);
+      const animal = marketAnimals[marketAnimals.length - 1];
+      animal.position.set(savedAnimal.x, savedAnimal.y, savedAnimal.z);
+      animal.rotation.y = savedAnimal.rotation;
+      animal.userData.fedDay = savedAnimal.fedDay;
+    });
+    sheep = marketAnimals.filter((animal) => animal.userData.kind === "sheep").length;
+    pigs = marketAnimals.filter((animal) => animal.userData.kind === "pig").length;
+    horses = marketAnimals.filter((animal) => animal.userData.kind === "horse").length;
+    vegetableGardens.splice(0).forEach((garden) => scene.remove(garden));
+    vegetablePlotPositions.splice(0);
+    (save.gardens ?? []).forEach((savedGarden) => {
+      addVegetablePlot(savedGarden.x, savedGarden.z);
+      vegetablePlotPositions.push(new THREE.Vector2(savedGarden.x, savedGarden.z));
+      const garden = vegetableGardens[vegetableGardens.length - 1];
+      garden.userData.stage = savedGarden.stage;
+      (garden.userData.carrots as THREE.Mesh[]).forEach(
+        (carrot) => (carrot.visible = savedGarden.stage === "ripe"),
+      );
+      (garden.userData.leaves as THREE.Mesh[]).forEach(
+        (leaves) => (leaves.visible = savedGarden.stage !== "bare"),
+      );
+    });
+    vegetablePlots = vegetableGardens.length;
+    deliveredVehicles.clear();
+    (save.deliveredVehicles ?? []).forEach((kind) => {
+      if (kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor") {
+        deliveredVehicles.add(kind);
+        replaceFarmVehicle(kind);
+      }
+    });
+    save.vehicles?.forEach((savedVehicle, index) => {
+      const vehicle = [tractor, harvester, planter, loader][index];
+      if (!vehicle) return;
+      vehicle.position.set(savedVehicle.x, savedVehicle.y, savedVehicle.z);
+      vehicle.rotation.y = savedVehicle.rotation;
+    });
+    toast.textContent = "Saved farm progress restored.";
+  } catch {
+    toast.textContent = "Saved progress could not be restored.";
+  }
+}
+saveButton.addEventListener("click", saveGame);
+loadGame();
 refreshFarm();
 refreshDayTimer();
 const youngWheatColor = new THREE.Color(0x4f913f),
