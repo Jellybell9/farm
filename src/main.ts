@@ -923,6 +923,98 @@ for (const [cowIndex, [x, z]] of [
   scene.add(cow);
   cattle.push(cow);
 }
+const wildAnimals: THREE.Group[] = [];
+function addWildAnimal(kind: "wolf" | "bear", x: number, z: number) {
+  const animal = new THREE.Group();
+  const bear = kind === "bear";
+  const fur = new THREE.MeshStandardMaterial({
+    color: bear ? 0x4a3025 : 0x69706b,
+    roughness: 1,
+  });
+  const darkFur = new THREE.MeshStandardMaterial({ color: 0x1b1b1a, roughness: 1 });
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(bear ? 0.72 : 0.43, 12, 9),
+    fur,
+  );
+  body.position.y = bear ? 0.78 : 0.58;
+  body.scale.set(bear ? 1 : 0.9, bear ? 0.95 : 0.82, bear ? 1.35 : 1.65);
+  animal.add(body);
+  const headPivot = new THREE.Group();
+  headPivot.position.set(0, bear ? 1.06 : 0.76, bear ? 0.64 : 0.52);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(bear ? 0.38 : 0.27, 10, 8),
+    fur,
+  );
+  head.position.set(0, bear ? 0.2 : 0.14, bear ? 0.3 : 0.26);
+  const muzzle = new THREE.Mesh(
+    new THREE.SphereGeometry(bear ? 0.17 : 0.12, 9, 7),
+    darkFur,
+  );
+  muzzle.position.set(0, bear ? 0.09 : 0.04, bear ? 0.59 : 0.48);
+  headPivot.add(head, muzzle);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(
+      new THREE.ConeGeometry(bear ? 0.12 : 0.1, bear ? 0.2 : 0.24, 7),
+      fur,
+    );
+    ear.position.set(side * (bear ? 0.21 : 0.16), bear ? 0.5 : 0.4, bear ? 0.2 : 0.15);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 7, 6), darkFur);
+    eye.position.set(side * (bear ? 0.22 : 0.16), bear ? 0.25 : 0.2, bear ? 0.46 : 0.38);
+    headPivot.add(ear, eye);
+  }
+  animal.add(headPivot);
+  const legs: THREE.Group[] = [];
+  const legHeight = bear ? 0.72 : 0.52;
+  for (const [legX, legZ] of [[-0.32, -0.42], [0.32, -0.42], [-0.32, 0.42], [0.32, 0.42]]) {
+    const leg = new THREE.Group();
+    leg.position.set(legX * (bear ? 1.35 : 1), legHeight, legZ * (bear ? 1.3 : 1));
+    const limb = new THREE.Mesh(
+      new THREE.CylinderGeometry(bear ? 0.12 : 0.075, bear ? 0.1 : 0.065, legHeight, 7),
+      fur,
+    );
+    limb.position.y = -legHeight / 2;
+    const paw = new THREE.Mesh(new THREE.BoxGeometry(bear ? 0.23 : 0.15, 0.09, bear ? 0.3 : 0.22), darkFur);
+    paw.position.set(0, -legHeight + 0.045, 0.04);
+    leg.add(limb, paw);
+    animal.add(leg);
+    legs.push(leg);
+  }
+  const tail = new THREE.Mesh(
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, bear ? 0.82 : 0.7, bear ? -0.9 : -0.72),
+        new THREE.Vector3(0, bear ? 0.68 : 0.55, bear ? -1.02 : -1.03),
+        new THREE.Vector3(0.06, bear ? 0.54 : 0.44, bear ? -0.92 : -1.12),
+      ]),
+      10,
+      bear ? 0.07 : 0.055,
+      6,
+      false,
+    ),
+    fur,
+  );
+  animal.add(tail);
+  animal.position.set(x, yWorld(x, z), z);
+  animal.rotation.y = Math.random() * Math.PI * 2;
+  animal.userData.kind = kind;
+  animal.userData.home = new THREE.Vector2(x, z);
+  animal.userData.target = new THREE.Vector2(x, z);
+  animal.userData.roamTimer = 2 + Math.random() * 5;
+  animal.userData.speed = bear ? 0.72 : 1.05;
+  animal.userData.head = headPivot;
+  animal.userData.legs = legs;
+  animal.userData.tail = tail;
+  animal.userData.attackTime = 0;
+  animal.userData.killsTonight = 0;
+  animal.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.castShadow = true;
+  });
+  scene.add(animal);
+  wildAnimals.push(animal);
+}
+addWildAnimal("wolf", -24, 11);
+addWildAnimal("wolf", -19, 17);
+addWildAnimal("bear", -37, 25);
 // Dense woodland occupies the west of the valley.
 for (let x = -27; x <= -14; x += 1.5)
   for (let z = 6; z <= 20; z += 1.6) {
@@ -2601,6 +2693,107 @@ function updateMarketAnimals(dt: number, time: number) {
     if (mane) mane.rotation.z = Math.sin(time * 7 + index) * 0.045;
   });
 }
+function animateWildLegs(legs: THREE.Group[], stride: number, amount: number) {
+  legs.forEach((leg, index) => {
+    const phase = index === 0 || index === 3 ? 1 : -1;
+    leg.rotation.x = stride * phase * amount;
+  });
+}
+function chooseWildRoamSpot(animal: THREE.Group) {
+  const home = animal.userData.home as THREE.Vector2;
+  const target = new THREE.Vector2(
+    home.x + (Math.random() - 0.5) * 12,
+    home.y + (Math.random() - 0.5) * 12,
+  );
+  animal.userData.target = target;
+}
+function removeLivestock(prey: THREE.Group, predator: THREE.Group) {
+  const cowIndex = cattle.indexOf(prey);
+  if (cowIndex >= 0) {
+    cattle.splice(cowIndex, 1);
+    scene.remove(prey);
+  } else {
+    const marketIndex = marketAnimals.indexOf(prey);
+    if (marketIndex < 0) return;
+    marketAnimals.splice(marketIndex, 1);
+    scene.remove(prey);
+    const kind = prey.userData.kind as "sheep" | "pig" | "horse";
+    if (kind === "sheep") sheep = Math.max(0, sheep - 1);
+    if (kind === "pig") pigs = Math.max(0, pigs - 1);
+    if (kind === "horse") horses = Math.max(0, horses - 1);
+  }
+  predator.userData.killsTonight++;
+  predator.userData.prey = undefined;
+  predator.userData.attackTime = 0;
+  refreshFarm();
+  toast.textContent = `A ${predator.userData.kind} attacked and killed livestock in the pasture!`;
+}
+function updateWildAnimals(dt: number, time: number) {
+  const night = dayElapsed >= DAY_LENGTH_SECONDS;
+  wildAnimals.forEach((animal, index) => {
+    const legs = animal.userData.legs as THREE.Group[];
+    const head = animal.userData.head as THREE.Object3D;
+    const tail = animal.userData.tail as THREE.Object3D;
+    let target = animal.userData.target as THREE.Vector2;
+    if (!night) {
+      animal.userData.killsTonight = 0;
+      animal.userData.prey = undefined;
+      animal.userData.attackTime = 0;
+      animal.userData.roamTimer -= dt;
+      if (animal.userData.roamTimer <= 0 || target.distanceTo(new THREE.Vector2(animal.position.x, animal.position.z)) < 0.4) {
+        chooseWildRoamSpot(animal);
+        target = animal.userData.target as THREE.Vector2;
+        animal.userData.roamTimer = 5 + Math.random() * 9;
+      }
+    } else if ((animal.userData.killsTonight as number) < 1) {
+      const livestock = [...cattle, ...marketAnimals];
+      let prey = animal.userData.prey as THREE.Group | undefined;
+      if (!prey || !livestock.includes(prey)) {
+        prey = livestock.sort(
+          (a, b) => animal.position.distanceTo(a.position) - animal.position.distanceTo(b.position),
+        )[0];
+        animal.userData.prey = prey;
+      }
+      if (prey) {
+        target = new THREE.Vector2(prey.position.x, prey.position.z);
+        const distance = animal.position.distanceTo(prey.position);
+        if (distance < 1.05) {
+          if (animal.userData.attackTime === 0)
+            toast.textContent = `A ${animal.userData.kind} is attacking livestock!`;
+          animal.userData.attackTime += dt;
+          animateWildLegs(legs, 0, 0);
+          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, -0.3, Math.min(1, dt * 6));
+          if (animal.userData.attackTime >= 4) removeLivestock(prey, animal);
+          return;
+        }
+      }
+    } else {
+      target = animal.userData.home as THREE.Vector2;
+    }
+    const dx = target.x - animal.position.x;
+    const dz = target.y - animal.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance > 0.08) {
+      const heading = Math.atan2(dx, dz);
+      const turn = THREE.MathUtils.euclideanModulo(
+        heading - animal.rotation.y + Math.PI,
+        Math.PI * 2,
+      ) - Math.PI;
+      animal.rotation.y += turn * Math.min(1, dt * 3);
+      const step = Math.min(distance, (animal.userData.speed as number) * dt);
+      animal.position.x += (dx / distance) * step;
+      animal.position.z += (dz / distance) * step;
+      animal.position.x = THREE.MathUtils.clamp(animal.position.x, -50, 50);
+      animal.position.z = THREE.MathUtils.clamp(animal.position.z, -50, 50);
+      animal.position.y = yWorld(animal.position.x, animal.position.z);
+      animateWildLegs(legs, Math.sin(time * 12 + index), 0.5);
+      head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0, Math.min(1, dt * 5));
+    } else {
+      animateWildLegs(legs, 0, 0);
+    }
+    tail.rotation.y = Math.sin(time * 4 + index) * 0.18;
+  });
+}
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
@@ -2625,6 +2818,7 @@ function loop() {
   updateSky(dt);
   updateCattle(dt, t);
   updateMarketAnimals(dt, t);
+  updateWildAnimals(dt, t);
   const nearbyCow = cattle.find(
     (cow) => cow.position.distanceTo(hero.position) <= 2,
   );
