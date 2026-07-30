@@ -1550,7 +1550,7 @@ const baleObjects: THREE.Mesh[] = [],
 const toast = document.querySelector("#toast")!,
   questText = document.querySelector("#questText")!,
   shardLabel = document.querySelector("#shards")!,
-  location = document.querySelector("#location")!,
+  locationLabel = document.querySelector("#location")!,
   wheatLabel = document.querySelector("#wheat")!,
   milkLabel = document.querySelector("#milk")!,
   vegetablesLabel = document.querySelector("#vegetables")!,
@@ -2668,7 +2668,11 @@ function endDay() {
       ? `${dayReport} Day ${farmDay}: ${ripenedGardens ? `${ripenedGardens} garden${ripenedGardens === 1 ? "" : "s"} ripened. ` : ""}Feed the herd and pigs.`
       : `Day ${farmDay}: feed the herd and pigs before night.`;
 }
-const SAVE_KEY = "greenacre-farm-save-v1";
+// Bump this when a gameplay update changes saved-state assumptions. Keeping
+// older saves under their old key means they cannot restore stale state over a
+// newly updated farm, while still leaving the browser data recoverable.
+const SAVE_VERSION = 2;
+const SAVE_KEY = `greenacre-farm-save-v${SAVE_VERSION}`;
 type SavedAnimal = {
   kind: "sheep" | "pig" | "horse";
   x: number;
@@ -2679,7 +2683,7 @@ type SavedAnimal = {
 };
 function saveGame() {
   const save = {
-    version: 1,
+    version: SAVE_VERSION,
     hero: { x: hero.position.x, y: hero.position.y, z: hero.position.z, rotation: hero.rotation.y },
     supplies: {
       shardCount, wheat, milk, chilledMilk, fridgeVegetables, carriedVegetables,
@@ -2736,6 +2740,7 @@ function loadGame() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return;
     const save = JSON.parse(raw) as {
+      version?: number;
       hero?: { x: number; y: number; z: number; rotation: number };
       supplies?: Record<string, unknown>;
       animals?: SavedAnimal[];
@@ -2749,6 +2754,7 @@ function loadGame() {
       deliveredVehicles?: VehicleMarketItem[];
       vehicles?: { x: number; y: number; z: number; rotation: number }[];
     };
+    if (save.version !== SAVE_VERSION) return;
     if (save.supplies) {
       const supplies = save.supplies;
       const number = (name: string, fallback: number) =>
@@ -2860,7 +2866,8 @@ function loadGame() {
 }
 function updateContinueFarmButton() {
   try {
-    continueFarmButton.hidden = !localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(SAVE_KEY);
+    continueFarmButton.hidden = !raw || JSON.parse(raw).version !== SAVE_VERSION;
   } catch {
     continueFarmButton.hidden = true;
   }
@@ -2882,7 +2889,7 @@ function restartGame() {
   } catch {
     // A reload still restarts the running session when browser storage is unavailable.
   }
-  location.reload();
+  window.location.reload();
 }
 saveButton.addEventListener("click", saveGame);
 restartButton.addEventListener("click", restartGame);
@@ -3696,7 +3703,7 @@ function loop() {
       Math.sin(t * 2 + s.position.x) * 0.12;
   });
   const d = hero.position.distanceTo(beacon.position);
-  location.textContent =
+  locationLabel.textContent =
     d < 12
       ? "WINDMILL HILL"
       : hero.position.x < -13
