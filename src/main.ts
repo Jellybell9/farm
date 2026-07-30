@@ -1267,6 +1267,7 @@ const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   tractorEngine: { price: 160, label: "tractor engine" },
 };
 const marketNote = document.querySelector("#marketNote")!;
+const marketAnimals: THREE.Group[] = [];
 
 function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   const animal = new THREE.Group();
@@ -1315,6 +1316,13 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
       eye.position.set(x * 1.55, 1.75, 1.28);
       animal.add(ear, eye);
     }
+    const blaze = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0xf0dfbf, roughness: 0.9 }),
+    );
+    blaze.position.set(0, 1.72, 1.38);
+    blaze.scale.set(0.65, 1.7, 0.18);
+    animal.add(blaze);
 
     const mane = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 1 });
     for (let segment = 0; segment < 6; segment++) {
@@ -1346,6 +1354,37 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
       wool.position.set(x, 0.78, z);
       animal.add(wool);
     }
+    const face = new THREE.MeshStandardMaterial({ color: 0x4a3a32, roughness: 1 });
+    head.material = face;
+    snout.material = face;
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), face);
+      ear.position.set(side * 0.18, 0.96, 0.5);
+      ear.scale.set(1, 0.35, 0.8);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), dark);
+      eye.position.set(side * 0.18, 0.9, 0.65);
+      animal.add(ear, eye);
+    }
+  } else if (kind === "pig") {
+    const innerEar = new THREE.MeshStandardMaterial({ color: 0xd57982, roughness: 0.95 });
+    const pigEye = new THREE.MeshStandardMaterial({ color: 0x251a1b, roughness: 0.8 });
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.24, 6), innerEar);
+      ear.position.set(side * 0.18, 1.07, 0.45);
+      ear.rotation.z = side * 0.36;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), pigEye);
+      eye.position.set(side * 0.19, 0.91, 0.64);
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 5), pigEye);
+      nostril.position.set(side * 0.055, 0.82, 0.75);
+      animal.add(ear, eye, nostril);
+    }
+    const curlyTail = new THREE.Mesh(
+      new THREE.TorusGeometry(0.12, 0.025, 6, 10, Math.PI * 1.5),
+      innerEar,
+    );
+    curlyTail.position.set(0, 0.8, -0.58);
+    curlyTail.rotation.x = Math.PI / 2;
+    animal.add(curlyTail);
   }
   const slot = number - 1;
   // Keep purchased animals in the visible, fenced pasture. The old spawn area
@@ -1354,10 +1393,17 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   const z = 9.6 + Math.floor(slot / 3) * 2.1;
   animal.position.set(x, yWorld(x, z), z);
   animal.rotation.y = kind === "horse" ? Math.PI / 2 : (slot % 2) * Math.PI;
+  animal.userData.kind = kind;
+  animal.userData.head = head;
+  animal.userData.target = new THREE.Vector2(x, z);
+  animal.userData.state = "grazing";
+  animal.userData.stateTimer = 1.5 + Math.random() * 3;
+  animal.userData.speed = kind === "horse" ? 0.72 : kind === "pig" ? 0.48 : 0.42;
   animal.traverse((object) => {
     if (object instanceof THREE.Mesh) object.castShadow = true;
   });
   scene.add(animal);
+  marketAnimals.push(animal);
 }
 
 function addVegetablePlot(number: number) {
@@ -2269,6 +2315,66 @@ function updateCattle(dt: number, time: number) {
     cow.position.y = yWorld(cow.position.x, cow.position.z);
   });
 }
+function chooseMarketAnimalSpot(animal: THREE.Group) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const target = new THREE.Vector2(
+      pasture.minX + 1.2 + Math.random() * (pasture.maxX - pasture.minX - 2.4),
+      pasture.minZ + 1.2 + Math.random() * (pasture.maxZ - pasture.minZ - 2.4),
+    );
+    const clearOfHerd = [...cattle, ...marketAnimals].every(
+      (other) =>
+        other === animal ||
+        target.distanceTo(new THREE.Vector2(other.position.x, other.position.z)) > 1.35,
+    );
+    if (clearOfHerd) {
+      animal.userData.target = target;
+      return;
+    }
+  }
+  animal.userData.target = new THREE.Vector2(
+    pasture.minX + 1.2 + Math.random() * (pasture.maxX - pasture.minX - 2.4),
+    pasture.minZ + 1.2 + Math.random() * (pasture.maxZ - pasture.minZ - 2.4),
+  );
+}
+function updateMarketAnimals(dt: number, time: number) {
+  marketAnimals.forEach((animal, index) => {
+    const head = animal.userData.head as THREE.Mesh;
+    animal.userData.stateTimer -= dt;
+    if (animal.userData.state === "grazing") {
+      head.rotation.x = THREE.MathUtils.lerp(
+        head.rotation.x,
+        0.28 + Math.sin(time * 2.4 + index) * 0.06,
+        Math.min(1, dt * 4),
+      );
+      if (animal.userData.stateTimer <= 0) {
+        chooseMarketAnimalSpot(animal);
+        animal.userData.state = "walking";
+        animal.userData.stateTimer = 4 + Math.random() * 7;
+      }
+      return;
+    }
+    const target = animal.userData.target as THREE.Vector2;
+    const dx = target.x - animal.position.x;
+    const dz = target.y - animal.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < 0.15 || animal.userData.stateTimer <= 0) {
+      animal.userData.state = "grazing";
+      animal.userData.stateTimer = 2.5 + Math.random() * 5;
+      return;
+    }
+    const heading = Math.atan2(dx, dz);
+    const turn = THREE.MathUtils.euclideanModulo(
+      heading - animal.rotation.y + Math.PI,
+      Math.PI * 2,
+    ) - Math.PI;
+    animal.rotation.y += turn * Math.min(1, dt * 3);
+    const step = Math.min(distance, (animal.userData.speed as number) * dt);
+    animal.position.x += (dx / distance) * step;
+    animal.position.z += (dz / distance) * step;
+    animal.position.y = yWorld(animal.position.x, animal.position.z);
+    head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0, Math.min(1, dt * 6));
+  });
+}
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
@@ -2286,6 +2392,7 @@ function loop() {
   }
   refreshDayTimer();
   updateCattle(dt, t);
+  updateMarketAnimals(dt, t);
   const nearbyCow = cattle.find(
     (cow) => cow.position.distanceTo(hero.position) <= 2,
   );
