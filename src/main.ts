@@ -17,10 +17,6 @@ document.querySelector("#sellMilk")!.insertAdjacentHTML(
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
-document.querySelector("#dayTimer")!.parentElement!.insertAdjacentHTML(
-  "afterend",
-  `<button class="restart-button" id="restartButton">RESTART GAME</button>`,
-);
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<div class="interact-prompt" id="milkPrompt" hidden>PRESS <b>E</b> TO MILK COW</div>`,
@@ -28,6 +24,10 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<button class="save-button" id="saveButton">SAVE GAME</button>`,
+);
+document.querySelector(".ui")!.insertAdjacentHTML(
+  "beforeend",
+  `<button class="restart-button" id="restartButton">RESTART GAME</button>`,
 );
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
