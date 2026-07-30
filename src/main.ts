@@ -672,9 +672,35 @@ function canStandAt(x: number, z: number, radius = 0.32) {
     })
   )
     return false;
+  // Livestock and wildlife have physical bodies: the farmer must walk around
+  // them, except for the horse currently being ridden.
   if (
     cattle.some(
       (cow) => Math.hypot(x - cow.position.x, z - cow.position.z) < radius + 0.72,
+    )
+  )
+    return false;
+  if (
+    [...marketAnimals, ...wildAnimals].some(
+      (animal) =>
+        animal !== ridingHorse &&
+        Math.hypot(x - animal.position.x, z - animal.position.z) <
+          radius +
+            (animal.userData.kind === "horse" || animal.userData.kind === "bear"
+              ? 0.68
+              : 0.55),
+    )
+  )
+    return false;
+  if (
+    vegetableGardens.some(
+      (garden) => Math.hypot(x - garden.position.x, z - garden.position.z) < radius + 1.1,
+    )
+  )
+    return false;
+  if (
+    baleObjects.some(
+      (bale) => Math.hypot(x - bale.position.x, z - bale.position.z) < radius + 0.48,
     )
   )
     return false;
@@ -3415,7 +3441,9 @@ function loop() {
     // A jump keeps a little directional control, but covers far less ground
     // than running and can clear a narrow low obstacle.
     const airControlSpeed = airborne ? 2.1 : speed;
-    const collisionRadius = airborne ? 0 : 0.32;
+    // Air control should not let the farmer phase through walls, fences, or
+    // other solid objects while jumping.
+    const collisionRadius = ridingHorse ? 0.6 : 0.32;
     const stepX = moveX * airControlSpeed * dt,
       stepZ = moveZ * airControlSpeed * dt;
     // Resolve each axis separately so the farmer naturally slides along walls
