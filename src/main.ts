@@ -2733,10 +2733,14 @@ function saveGame() {
     })),
   };
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
-    toast.textContent = "Progress saved in this browser.";
+    const serializedSave = JSON.stringify(save);
+    localStorage.setItem(SAVE_KEY, serializedSave);
+    if (localStorage.getItem(SAVE_KEY) !== serializedSave)
+      throw new Error("The browser did not retain the saved data.");
+    continueFarmButton.hidden = false;
+    toast.textContent = "Progress saved. After reloading, choose Continue Saved Farm.";
   } catch {
-    toast.textContent = "This browser could not save progress.";
+    toast.textContent = "Progress was not saved. Allow browser storage for this site, then try again.";
   }
 }
 function loadGame() {
@@ -2863,6 +2867,8 @@ function loadGame() {
       vehicle.position.set(savedVehicle.x, savedVehicle.y, savedVehicle.z);
       vehicle.rotation.y = savedVehicle.rotation;
     });
+    refreshFarm();
+    refreshDayTimer();
     toast.textContent = "Saved farm progress restored.";
   } catch {
     toast.textContent = "Saved progress could not be restored.";
