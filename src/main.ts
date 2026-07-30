@@ -5,7 +5,7 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Drive the orange combine through ripe wheat to harvest it.</div></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
-  `<section class="home-screen" id="homeScreen"><div class="home-card"><p>WELCOME TO</p><h1>GREENACRE FARM</h1><span>Choose the farmer who will build your homestead.</span><div class="farmer-choices"><button class="farmer-choice selected" data-farmer="avery"><i class="farmer-avatar avery"></i><b>Avery</b><small>Steady hand</small></button><button class="farmer-choice" data-farmer="rowan"><i class="farmer-avatar rowan"></i><b>Rowan</b><small>Field expert</small></button><button class="farmer-choice" data-farmer="sage"><i class="farmer-avatar sage"></i><b>Sage</b><small>Animal friend</small></button></div><div class="home-actions"><button class="start-farm" id="startFarm">START NEW FARM</button><button class="continue-farm" id="continueFarm" hidden>CONTINUE SAVED FARM</button></div><small class="home-note">Start New Farm to play with the latest changes, or continue only when you want your saved progress.</small></div></section>`,
+  `<section class="home-screen" id="homeScreen"><div class="home-card"><p>WELCOME TO</p><h1>GREENACRE FARM</h1><span>Choose the farmer who will build your homestead.</span><div class="farmer-choices"><button class="farmer-choice selected" data-farmer="avery"><i class="farmer-avatar avery"></i><b>Cowboy Wyatt</b><small>Steady hand</small></button><button class="farmer-choice" data-farmer="rowan"><i class="farmer-avatar rowan"></i><b>Cowgirl Daisy</b><small>Field expert</small></button><button class="farmer-choice" data-farmer="sage"><i class="farmer-avatar sage"></i><b>Cowboy Cole</b><small>Animal friend</small></button></div><div class="home-actions"><button class="start-farm" id="startFarm">START NEW FARM</button><button class="continue-farm" id="continueFarm" hidden>CONTINUE SAVED FARM</button></div><small class="home-note">Start New Farm to play with the latest changes, or continue only when you want your saved progress.</small></div></section>`,
 );
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
@@ -1422,6 +1422,11 @@ const homeScreen = document.querySelector<HTMLElement>("#homeScreen")!;
 const startFarmButton = document.querySelector<HTMLButtonElement>("#startFarm")!;
 const continueFarmButton = document.querySelector<HTMLButtonElement>("#continueFarm")!;
 const farmerChoices = [...document.querySelectorAll<HTMLButtonElement>("[data-farmer]")];
+const farmerNames = {
+  avery: "Cowboy Wyatt",
+  rowan: "Cowgirl Daisy",
+  sage: "Cowboy Cole",
+} as const;
 function applyFarmerStyle(farmer: "avery" | "rowan" | "sage") {
   selectedFarmer = farmer;
   const styles = {
@@ -1448,7 +1453,7 @@ function beginFarm(message: string) {
   toast.textContent = message;
 }
 startFarmButton.addEventListener("click", () =>
-  beginFarm(`Welcome, ${selectedFarmer[0].toUpperCase()}${selectedFarmer.slice(1)}. Your new farm is ready.`),
+  beginFarm(`Welcome, ${farmerNames[selectedFarmer]}. Your new farm is ready.`),
 );
 continueFarmButton.addEventListener("click", () => {
   loadGame();
