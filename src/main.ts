@@ -13,7 +13,7 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
-  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><small class="market-note" id="marketNote">Sell farm goods to grow your homestead.</small>`,
+  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">FARM FLEET</p><div class="market-items"><button class="market-item" data-buy="houseTractor"><span><b>Yard tractor</b><small>Replaces the green tractor at the house</small></span><em>275</em></button><button class="market-item" data-buy="fieldTractor"><span><b>Field tractor</b><small>Replaces the planter at the wheat field</small></span><em>350</em></button><button class="market-item" data-buy="barnTractor"><span><b>Barn tractor</b><small>Replaces the loader at the barn</small></span><em>325</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><small class="market-note" id="marketNote">Sell farm goods to grow your homestead.</small>`,
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
@@ -1256,7 +1256,8 @@ function refreshFarm() {
 }
 type FarmMarketItem = "sheep" | "pig" | "vegetables" | "horse";
 type UpgradeMarketItem = "wideHeader" | "fastBaler" | "tractorEngine";
-type MarketItem = FarmMarketItem | UpgradeMarketItem;
+type VehicleMarketItem = "houseTractor" | "fieldTractor" | "barnTractor";
+type MarketItem = FarmMarketItem | UpgradeMarketItem | VehicleMarketItem;
 const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   sheep: { price: 80, label: "sheep" },
   pig: { price: 100, label: "pig" },
@@ -1265,9 +1266,13 @@ const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   wideHeader: { price: 225, label: "wide combine header" },
   fastBaler: { price: 180, label: "power baler" },
   tractorEngine: { price: 160, label: "tractor engine" },
+  houseTractor: { price: 275, label: "yard tractor" },
+  fieldTractor: { price: 350, label: "field tractor" },
+  barnTractor: { price: 325, label: "barn tractor" },
 };
 const marketNote = document.querySelector("#marketNote")!;
 const marketAnimals: THREE.Group[] = [];
+const deliveredVehicles = new Set<VehicleMarketItem>();
 
 function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   const animal = new THREE.Group();
@@ -1430,12 +1435,35 @@ function addVegetablePlot(number: number) {
   scene.add(plot);
 }
 
+function replaceFarmVehicle(kind: VehicleMarketItem) {
+  const deliveries: Record<VehicleMarketItem, { vehicle: THREE.Group; x: number; z: number; color: number }> = {
+    houseTractor: { vehicle: tractor, x: 5, z: -8.8, color: 0xc84535 },
+    fieldTractor: { vehicle: planter, x: -3.5, z: -17, color: 0xd5a42d },
+    barnTractor: { vehicle: loader, x: 3, z: -25, color: 0x3f7791 },
+  };
+  const delivery = deliveries[kind];
+  const paint = new THREE.MeshStandardMaterial({ color: delivery.color, roughness: 0.65 });
+  const upgradeCab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, 0.88), paint);
+  upgradeCab.position.set(0, 1.85, 0.35);
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.11, 0.15, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf2c94c, emissive: 0x80500d }),
+  );
+  beacon.position.set(0, 2.02, 0.35);
+  delivery.vehicle.add(upgradeCab, beacon);
+  delivery.vehicle.scale.setScalar(1.12);
+  delivery.vehicle.position.set(delivery.x, yWorld(delivery.x, delivery.z) + 0.05, delivery.z);
+  delivery.vehicle.rotation.y = Math.PI;
+}
+
 function buyMarketItem(kind: MarketItem) {
   const offer = marketOffers[kind];
   if (
     (kind === "wideHeader" && wideHeader) ||
     (kind === "fastBaler" && fastBaler) ||
-    (kind === "tractorEngine" && tractorEngine)
+    (kind === "tractorEngine" && tractorEngine) ||
+    ((kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor") &&
+      deliveredVehicles.has(kind))
   ) {
     marketNote.textContent = `Your ${offer.label} is already installed.`;
     return;
@@ -1452,6 +1480,9 @@ function buyMarketItem(kind: MarketItem) {
     fastBaler = true;
   } else if (kind === "tractorEngine") {
     tractorEngine = true;
+  } else if (kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor") {
+    deliveredVehicles.add(kind);
+    replaceFarmVehicle(kind);
   } else if (kind === "vegetables") {
     vegetablePlots++;
     addVegetablePlot(vegetablePlots);
@@ -1468,6 +1499,8 @@ function buyMarketItem(kind: MarketItem) {
   refreshFarm();
   marketNote.textContent = kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine"
     ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} installed!`
+    : kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor"
+      ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} delivered!`
     : `Welcome home, new ${offer.label}!`;
   toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" ? "the" : "a"} ${offer.label} for ${offer.price} coins.`;
 }
