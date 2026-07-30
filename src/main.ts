@@ -1208,16 +1208,27 @@ cowgirlDress.visible = false;
 const braids = new THREE.Group();
 for (const x of [-0.225, 0.225]) {
   const braid = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.042, 0.3, 4, 7),
+    new THREE.CapsuleGeometry(0.055, 0.62, 5, 8),
     darkHair,
   );
-  braid.position.set(x, 1.15, 0.035);
+  braid.position.set(x * 1.08, 0.97, 0.055);
   braid.rotation.z = x < 0 ? 0.12 : -0.12;
+  // Rounded sections keep the long hair readable as braids at gameplay
+  // distance instead of looking like two thin, flat strands.
+  for (const y of [1.14, 0.98, 0.82]) {
+    const braidSection = new THREE.Mesh(
+      new THREE.SphereGeometry(0.07, 8, 7),
+      darkHair,
+    );
+    braidSection.position.set(x * 1.08, y, 0.03);
+    braidSection.scale.set(0.82, 1.1, 0.72);
+    braids.add(braidSection);
+  }
   const tie = new THREE.Mesh(
     new THREE.SphereGeometry(0.046, 8, 6),
     new THREE.MeshStandardMaterial({ color: 0xe6b64f, roughness: 0.65 }),
   );
-  tie.position.set(x * 1.08, 0.96, 0.035);
+  tie.position.set(x * 1.13, 0.58, 0.055);
   braids.add(braid, tie);
 }
 braids.visible = false;
