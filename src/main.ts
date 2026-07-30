@@ -2315,8 +2315,12 @@ function updateCattle(dt: number, time: number) {
         const stride = Math.sin(time * 11 + index * 1.7);
         animateCowLegs(legs, stride, 0.52);
         const step = Math.min(distance, cow.userData.speed * dt);
-        cow.position.x += (dx / distance) * step;
-        cow.position.z += (dz / distance) * step;
+        const stepX = (dx / distance) * step;
+        const stepZ = (dz / distance) * step;
+        if (canAnimalStandAt(cow, cow.position.x + stepX, cow.position.z, 0.72))
+          cow.position.x += stepX;
+        if (canAnimalStandAt(cow, cow.position.x, cow.position.z + stepZ, 0.72))
+          cow.position.z += stepZ;
         cow.position.y = yWorld(cow.position.x, cow.position.z);
         return;
       }
@@ -2373,10 +2377,48 @@ function updateCattle(dt: number, time: number) {
     const stride = Math.sin(time * 11 + index * 1.7);
     animateCowLegs(legs, stride, 0.52);
     const step = Math.min(distance, cow.userData.speed * dt);
-    cow.position.x += (dx / distance) * step;
-    cow.position.z += (dz / distance) * step;
+    const stepX = (dx / distance) * step;
+    const stepZ = (dz / distance) * step;
+    if (canAnimalStandAt(cow, cow.position.x + stepX, cow.position.z, 0.72))
+      cow.position.x += stepX;
+    if (canAnimalStandAt(cow, cow.position.x, cow.position.z + stepZ, 0.72))
+      cow.position.z += stepZ;
     cow.position.y = yWorld(cow.position.x, cow.position.z);
   });
+}
+function canAnimalStandAt(animal: THREE.Group, x: number, z: number, radius: number) {
+  if (x < pasture.minX + radius || x > pasture.maxX - radius || z < pasture.minZ + radius || z > pasture.maxZ - radius)
+    return false;
+  if (
+    solidCircles.some(
+      (obstacle) => Math.hypot(x - obstacle.x, z - obstacle.z) < radius + obstacle.radius,
+    )
+  )
+    return false;
+  if (
+    solidBoxes.some((obstacle) => {
+      const nearestX = THREE.MathUtils.clamp(x, obstacle.x - obstacle.width / 2, obstacle.x + obstacle.width / 2);
+      const nearestZ = THREE.MathUtils.clamp(z, obstacle.z - obstacle.depth / 2, obstacle.z + obstacle.depth / 2);
+      return Math.hypot(x - nearestX, z - nearestZ) < radius;
+    })
+  )
+    return false;
+  if (
+    [...cattle, ...marketAnimals].some(
+      (other) => other !== animal && Math.hypot(x - other.position.x, z - other.position.z) < radius + 0.65,
+    )
+  )
+    return false;
+  const vehicleCollisionRadii = [
+    [tractor, 1.05],
+    [harvester, 1.35],
+    [planter, 1.05],
+    [loader, 1.05],
+  ] as const;
+  return !vehicleCollisionRadii.some(
+    ([vehicle, vehicleRadius]) =>
+      Math.hypot(x - vehicle.position.x, z - vehicle.position.z) < radius + vehicleRadius,
+  );
 }
 function chooseMarketAnimalSpot(animal: THREE.Group) {
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -2389,7 +2431,8 @@ function chooseMarketAnimalSpot(animal: THREE.Group) {
         other === animal ||
         target.distanceTo(new THREE.Vector2(other.position.x, other.position.z)) > 1.35,
     );
-    if (clearOfHerd) {
+    const radius = animal.userData.kind === "horse" ? 0.6 : 0.42;
+    if (clearOfHerd && canAnimalStandAt(animal, target.x, target.y, radius)) {
       animal.userData.target = target;
       return;
     }
@@ -2444,8 +2487,22 @@ function updateMarketAnimals(dt: number, time: number) {
     ) - Math.PI;
     animal.rotation.y += turn * Math.min(1, dt * 3);
     const step = Math.min(distance, (animal.userData.speed as number) * dt);
-    animal.position.x += (dx / distance) * step;
-    animal.position.z += (dz / distance) * step;
+    const radius = animal.userData.kind === "horse" ? 0.6 : 0.42;
+    let moved = false;
+    const stepX = (dx / distance) * step;
+    const stepZ = (dz / distance) * step;
+    if (canAnimalStandAt(animal, animal.position.x + stepX, animal.position.z, radius)) {
+      animal.position.x += stepX;
+      moved = true;
+    }
+    if (canAnimalStandAt(animal, animal.position.x, animal.position.z + stepZ, radius)) {
+      animal.position.z += stepZ;
+      moved = true;
+    }
+    if (!moved) {
+      chooseMarketAnimalSpot(animal);
+      animal.userData.stateTimer = 4 + Math.random() * 7;
+    }
     animal.position.y = yWorld(animal.position.x, animal.position.z);
     head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0, Math.min(1, dt * 6));
     const stride = Math.sin(time * 11 + index * 1.7);
