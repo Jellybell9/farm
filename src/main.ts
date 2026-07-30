@@ -13,7 +13,7 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
-  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><small class="market-note" id="marketNote">Build your farm or upgrade your equipment.</small>`,
+  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><p class="market-section">FARM DEFENSE</p><div class="market-items"><button class="market-item" data-buy="rifle"><span><b>Rifle</b><small>Press Q to protect livestock</small></span><em>300</em></button></div><small class="market-note" id="marketNote">Build your farm or upgrade your equipment.</small>`,
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
@@ -683,6 +683,7 @@ function canStandAt(x: number, z: number, radius = 0.32) {
   if (
     [...marketAnimals, ...wildAnimals].some(
       (animal) =>
+        animal.visible &&
         animal !== ridingHorse &&
         Math.hypot(x - animal.position.x, z - animal.position.z) <
           radius +
@@ -1250,6 +1251,24 @@ for (const x of [-0.32, 0.32]) {
   arms.push(armGroup);
   hero.add(armGroup);
 }
+const rifleModel = new THREE.Group();
+const rifleWood = new THREE.MeshStandardMaterial({ color: 0x5d3823, roughness: 0.88 });
+const rifleMetal = new THREE.MeshStandardMaterial({ color: 0x293238, metalness: 0.7, roughness: 0.35 });
+const rifleStock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.36), rifleWood);
+rifleStock.position.set(0, 0, -0.12);
+const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.54, 8), rifleMetal);
+rifleBarrel.rotation.x = Math.PI / 2;
+rifleBarrel.position.set(0, 0.035, -0.53);
+const rifleSight = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.04, 0.11), rifleMetal);
+rifleSight.position.set(0, 0.08, -0.35);
+rifleModel.add(rifleStock, rifleBarrel, rifleSight);
+rifleModel.position.set(0.27, 0.8, -0.27);
+rifleModel.rotation.set(0.08, -0.08, -0.08);
+rifleModel.visible = false;
+rifleModel.traverse((object) => {
+  if (object instanceof THREE.Mesh) object.castShadow = true;
+});
+hero.add(rifleModel);
 const milkBucket = new THREE.Group();
 const bucketMetal = new THREE.MeshStandardMaterial({
   color: 0x9eabb0,
@@ -1387,6 +1406,7 @@ let vy = 0,
   wideHeader = false,
   fastBaler = false,
   tractorEngine = false,
+  hasRifle = false,
   pendingVegetablePlot = false;
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
@@ -1525,7 +1545,8 @@ function refreshFarm() {
 type FarmMarketItem = "sheep" | "pig" | "vegetables" | "horse";
 type UpgradeMarketItem = "wideHeader" | "fastBaler" | "tractorEngine";
 type VehicleMarketItem = "houseTractor" | "fieldTractor" | "barnTractor";
-type MarketItem = FarmMarketItem | UpgradeMarketItem | VehicleMarketItem;
+type DefenseMarketItem = "rifle";
+type MarketItem = FarmMarketItem | UpgradeMarketItem | VehicleMarketItem | DefenseMarketItem;
 const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   sheep: { price: 80, label: "sheep" },
   pig: { price: 100, label: "pig" },
@@ -1534,6 +1555,7 @@ const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   wideHeader: { price: 225, label: "wide combine header" },
   fastBaler: { price: 180, label: "power baler" },
   tractorEngine: { price: 160, label: "tractor engine" },
+  rifle: { price: 300, label: "rifle" },
   houseTractor: { price: 275, label: "yard tractor" },
   fieldTractor: { price: 350, label: "field tractor" },
   barnTractor: { price: 325, label: "barn tractor" },
@@ -1856,6 +1878,7 @@ function buyMarketItem(kind: MarketItem) {
     (kind === "wideHeader" && wideHeader) ||
     (kind === "fastBaler" && fastBaler) ||
     (kind === "tractorEngine" && tractorEngine) ||
+    (kind === "rifle" && hasRifle) ||
     ((kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor") &&
       deliveredVehicles.has(kind))
   ) {
@@ -1874,6 +1897,9 @@ function buyMarketItem(kind: MarketItem) {
     fastBaler = true;
   } else if (kind === "tractorEngine") {
     tractorEngine = true;
+  } else if (kind === "rifle") {
+    hasRifle = true;
+    rifleModel.visible = true;
   } else if (kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor") {
     deliveredVehicles.add(kind);
     replaceFarmVehicle(kind);
@@ -1898,12 +1924,12 @@ function buyMarketItem(kind: MarketItem) {
     addMarketAnimal(kind, sheep + pigs + horses);
   }
   refreshFarm();
-  marketNote.textContent = kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine"
+  marketNote.textContent = kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" || kind === "rifle"
     ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} installed!`
     : kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor"
       ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} delivered!`
     : `Welcome home, new ${offer.label}!`;
-  toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" ? "the" : "a"} ${offer.label} for ${offer.price} coins.`;
+  toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" || kind === "rifle" ? "the" : "a"} ${offer.label} for ${offer.price} coins.${kind === "rifle" ? " Press Q to scare off nearby wild animals." : ""}`;
 }
 function refreshDayTimer() {
   const night = dayElapsed >= DAY_LENGTH_SECONDS;
@@ -2390,6 +2416,37 @@ function pickUpNearby() {
   }
   toast.textContent = "Nothing nearby to pick up.";
 }
+function shootRifle() {
+  if (!hasRifle) {
+    toast.textContent = "Buy a rifle from the marketplace before confronting wild animals.";
+    return;
+  }
+  if (driving || resting) {
+    toast.textContent = "Get on foot before using the rifle.";
+    return;
+  }
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(hero.quaternion);
+  const target = wildAnimals
+    .filter((animal) => animal.visible)
+    .map((animal) => {
+      const offset = animal.position.clone().sub(hero.position);
+      offset.y = 0;
+      const distance = offset.length();
+      return { animal, distance, aim: distance > 0 ? forward.dot(offset.normalize()) : -1 };
+    })
+    .filter(({ distance, aim }) => distance <= 24 && aim > 0.82)
+    .sort((a, b) => a.distance - b.distance)[0]?.animal;
+  if (!target) {
+    toast.textContent = "No wild animal is in front of you and within rifle range.";
+    return;
+  }
+  target.visible = false;
+  target.userData.prey = undefined;
+  target.userData.attackTime = 0;
+  target.userData.killsTonight = 1;
+  target.userData.respawnAt = performance.now() + 35_000;
+  toast.textContent = `The ${target.userData.kind} retreats to its home range. It will return later.`;
+}
 addEventListener("keydown", (e) => {
   keys.add(e.code);
   if (
@@ -2399,6 +2456,11 @@ addEventListener("keydown", (e) => {
     hero.position.y <= playerGroundY(hero.position.x, hero.position.z) + 0.14
   )
     vy = 6.2;
+  if (e.code === "KeyQ") {
+    e.preventDefault();
+    shootRifle();
+    return;
+  }
   if (e.code === "KeyF" && pendingVegetablePlot && !driving && !resting) {
     e.preventDefault();
     placeVegetablePlot();
@@ -2591,7 +2653,7 @@ function saveGame() {
       carryingFridgeVegetable, cattleCare, ripePlots, farmDay, cropMaturity,
       fedBales, coins, dayElapsed, storedBales, sheep, pigs, vegetablePlots, horses,
       cattleCount: cattle.length,
-      wideHeader, fastBaler, tractorEngine,
+      wideHeader, fastBaler, tractorEngine, hasRifle,
     },
     animals: marketAnimals.map((animal): SavedAnimal => ({
       kind: animal.userData.kind,
@@ -2661,7 +2723,9 @@ function loadGame() {
       wideHeader = supplies.wideHeader === true;
       fastBaler = supplies.fastBaler === true;
       tractorEngine = supplies.tractorEngine === true;
+      hasRifle = supplies.hasRifle === true;
       cutter.scale.x = wideHeader ? 1.7 : 1;
+      rifleModel.visible = hasRifle;
     }
     if (save.hero) {
       hero.position.set(save.hero.x, save.hero.y, save.hero.z);
@@ -3253,6 +3317,18 @@ function removeLivestock(prey: THREE.Group, predator: THREE.Group) {
 function updateWildAnimals(dt: number, time: number) {
   const night = dayElapsed >= DAY_LENGTH_SECONDS;
   wildAnimals.forEach((animal, index) => {
+    if (!animal.visible) {
+      if (performance.now() >= (animal.userData.respawnAt as number)) {
+        const home = animal.userData.home as THREE.Vector2;
+        animal.visible = true;
+        animal.position.set(home.x, yWorld(home.x, home.y), home.y);
+        animal.userData.target = home.clone();
+        animal.userData.roamTimer = 3 + Math.random() * 4;
+        animal.userData.killsTonight = 0;
+        animal.userData.attackTime = 0;
+      }
+      return;
+    }
     const legs = animal.userData.legs as THREE.Group[];
     const head = animal.userData.head as THREE.Object3D;
     const tail = animal.userData.tail as THREE.Object3D;
