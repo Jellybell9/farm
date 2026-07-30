@@ -1671,6 +1671,10 @@ function dismountHorse() {
   ridingHorse = null;
   hero.position.set(exit.x, playerGroundY(exit.x, exit.z), exit.z);
   hero.rotation.y = horse.rotation.y - Math.PI;
+  hero.scale.y = 1;
+  coat.position.y = 0.72;
+  legs.forEach((leg) => leg.rotation.set(0, 0, 0));
+  arms.forEach((arm) => arm.rotation.set(0, 0, 0));
   toast.textContent = "You dismount the horse.";
 }
 function restOnFurniture(mode: "sitting" | "lying") {
