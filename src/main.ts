@@ -1309,9 +1309,54 @@ let vy = 0,
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
   hasMilkBucket = false,
-  resting: "sitting" | "lying" | null = null;
+  resting: "sitting" | "lying" | null = null,
+  ridingHorse: THREE.Group | null = null;
 const couchSpot = new THREE.Vector2(10, -6.45);
 const bedSpot = new THREE.Vector2(7.4, -2.95);
+function mountHorse(horse: THREE.Group) {
+  ridingHorse = horse;
+  horse.userData.ridden = true;
+  horse.userData.feedBale = undefined;
+  hero.position.set(horse.position.x, horse.position.y + 1.47, horse.position.z);
+  hero.rotation.y = horse.rotation.y - Math.PI;
+  vy = 0;
+  toast.textContent = "You mount the horse. Use the arrow keys to ride faster; press E to dismount.";
+}
+function dismountHorse() {
+  if (!ridingHorse) return;
+  const horse = ridingHorse;
+  const side = new THREE.Vector3(1.25, 0, 0).applyAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    horse.rotation.y,
+  );
+  const options = [
+    side,
+    side.clone().multiplyScalar(-1),
+    new THREE.Vector3(0, 0, -1.35).applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      horse.rotation.y,
+    ),
+  ];
+  const exit = options
+    .map(
+      (offset) =>
+        new THREE.Vector3(
+          horse.position.x + offset.x,
+          0,
+          horse.position.z + offset.z,
+        ),
+    )
+    .find((position) => canStandAt(position.x, position.z));
+  if (!exit) {
+    toast.textContent = "There is no clear space to dismount here.";
+    return;
+  }
+  horse.userData.ridden = false;
+  ridingHorse = null;
+  hero.position.set(exit.x, playerGroundY(exit.x, exit.z), exit.z);
+  hero.rotation.y = horse.rotation.y - Math.PI;
+  toast.textContent = "You dismount the horse.";
+}
 function restOnFurniture(mode: "sitting" | "lying") {
   resting = mode;
   vy = 0;
@@ -1470,13 +1515,31 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
     }
   }
   if (horse) {
+    // Two overlapping low-poly forms create a broad, natural connection from
+    // the shoulders into the head without the old thin, floating neck piece.
+    const neck = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 9), coat);
+    neck.position.set(0, 1.31, 0.62);
+    neck.scale.set(0.92, 1.42, 1.02);
+    neck.rotation.x = -0.26;
+    animal.add(neck);
+    const throat = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 8), coat);
+    throat.position.set(0, 1.47, 0.84);
+    throat.scale.set(0.86, 1.16, 0.9);
+    animal.add(throat);
+    const innerEar = new THREE.MeshStandardMaterial({ color: 0x9b6047, roughness: 1 });
+    const eyeGlint = new THREE.MeshStandardMaterial({ color: 0xe7d89e, roughness: 0.35 });
     for (const x of [-0.14, 0.14]) {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.25, 8), coat);
       ear.position.set(x, 0.64, 0.32);
       ear.rotation.x = -0.12;
+      const earCenter = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 7), innerEar);
+      earCenter.position.set(x, 0.635, 0.34);
+      earCenter.rotation.x = -0.12;
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), dark);
       eye.position.set(x * 1.55, 0.41, 0.53);
-      headPivot.add(ear, eye);
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), eyeGlint);
+      glint.position.set(x * 1.7, 0.425, 0.556);
+      headPivot.add(ear, earCenter, eye, glint);
     }
     const blaze = new THREE.Mesh(
       new THREE.SphereGeometry(0.075, 8, 6),
@@ -2256,6 +2319,8 @@ addEventListener("keydown", (e) => {
         hero.visible = false;
         toast.textContent = "No clear space to get out here.";
       }
+    } else if (ridingHorse) {
+      dismountHorse();
     } else if (resting) {
       standUp();
     } else if (Math.hypot(hero.position.x - couchSpot.x, hero.position.z - couchSpot.y) <= 1.45) {
@@ -2266,48 +2331,58 @@ addEventListener("keydown", (e) => {
       // The kitchen interaction takes precedence over vehicles beyond the house.
     } else if (interactWithVegetablePlot()) {
       // Garden plots can be harvested or replanted directly.
-    } else if (hero.position.distanceTo(tractor.position) < 2.5) {
-      driving = true;
-      usingHarvester = false;
-      usingPlanter = false;
-      usingLoader = false;
-      hero.visible = false;
-      hero.position.copy(tractor.position);
-      toast.textContent =
-        "Green tractor started. Drive over sheaves to collect and bale them.";
-    } else if (hero.position.distanceTo(harvester.position) < 2.8) {
-      driving = true;
-      usingHarvester = true;
-      usingPlanter = false;
-      usingLoader = false;
-      hero.visible = false;
-      hero.position.copy(harvester.position);
-      toast.textContent =
-        "Orange combine started. Drive through ripe wheat to cut it down.";
-    } else if (hero.position.distanceTo(planter.position) < 2.8) {
-      driving = true;
-      usingHarvester = false;
-      usingPlanter = true;
-      usingLoader = false;
-      hero.visible = false;
-      hero.position.copy(planter.position);
-      toast.textContent =
-        "Purple planter started. Drive over bare dirt to sow wheat.";
-    } else if (hero.position.distanceTo(loader.position) < 2.8) {
-      driving = true;
-      usingHarvester = false;
-      usingPlanter = false;
-      usingLoader = true;
-      hero.visible = false;
-      hero.position.copy(loader.position);
-      toast.textContent =
-        "Blue bale loader started. Drive over a bale to lift it, then press F to drop it.";
-    } else if (hero.position.distanceTo(beacon.position) < 4) {
-      interacted = true;
-      questText.textContent =
-        "The mill is turning. Make three bales for the herd before nightfall.";
-      toast.textContent = "The windmill hums to life!";
-    } else farmAction();
+    } else {
+      const nearbyHorse = marketAnimals.find(
+        (animal) =>
+          animal.userData.kind === "horse" &&
+          !animal.userData.ridden &&
+          animal.position.distanceTo(hero.position) <= 2.1,
+      );
+      if (nearbyHorse) {
+        mountHorse(nearbyHorse);
+      } else if (hero.position.distanceTo(tractor.position) < 2.5) {
+        driving = true;
+        usingHarvester = false;
+        usingPlanter = false;
+        usingLoader = false;
+        hero.visible = false;
+        hero.position.copy(tractor.position);
+        toast.textContent =
+          "Green tractor started. Drive over sheaves to collect and bale them.";
+      } else if (hero.position.distanceTo(harvester.position) < 2.8) {
+        driving = true;
+        usingHarvester = true;
+        usingPlanter = false;
+        usingLoader = false;
+        hero.visible = false;
+        hero.position.copy(harvester.position);
+        toast.textContent =
+          "Orange combine started. Drive through ripe wheat to cut it down.";
+      } else if (hero.position.distanceTo(planter.position) < 2.8) {
+        driving = true;
+        usingHarvester = false;
+        usingPlanter = true;
+        usingLoader = false;
+        hero.visible = false;
+        hero.position.copy(planter.position);
+        toast.textContent =
+          "Purple planter started. Drive over bare dirt to sow wheat.";
+      } else if (hero.position.distanceTo(loader.position) < 2.8) {
+        driving = true;
+        usingHarvester = false;
+        usingPlanter = false;
+        usingLoader = true;
+        hero.visible = false;
+        hero.position.copy(loader.position);
+        toast.textContent =
+          "Blue bale loader started. Drive over a bale to lift it, then press F to drop it.";
+      } else if (hero.position.distanceTo(beacon.position) < 4) {
+        interacted = true;
+        questText.textContent =
+          "The mill is turning. Make three bales for the herd before nightfall.";
+        toast.textContent = "The windmill hums to life!";
+      } else farmAction();
+    }
   }
 });
 addEventListener("keyup", (e) => keys.delete(e.code));
@@ -2768,6 +2843,13 @@ function updateMarketAnimals(dt: number, time: number) {
     const legs = animal.userData.legs as THREE.Group[];
     const mane = animal.userData.mane as THREE.Group | undefined;
     const tail = animal.userData.tail as THREE.Group | undefined;
+    if (animal.userData.ridden) {
+      animateMarketAnimalLegs(legs, 0, 0);
+      head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0, Math.min(1, dt * 7));
+      if (tail) tail.rotation.y = Math.sin(time * 3 + index) * 0.08;
+      if (mane) mane.rotation.z = Math.sin(time * 3 + index) * 0.025;
+      return;
+    }
     animal.userData.stateTimer -= dt;
     const feedBale = animal.userData.feedBale as THREE.Mesh | undefined;
     if (feedBale) {
@@ -2912,7 +2994,10 @@ function updateWildAnimals(dt: number, time: number) {
         animal.userData.roamTimer = 5 + Math.random() * 9;
       }
     } else if ((animal.userData.killsTonight as number) < 1) {
-      const livestock = [...cattle, ...marketAnimals];
+      const livestock = [
+        ...cattle,
+        ...marketAnimals.filter((animal) => !animal.userData.ridden),
+      ];
       let prey = animal.userData.prey as THREE.Group | undefined;
       if (!prey || !livestock.includes(prey)) {
         prey = livestock.sort(
@@ -2964,8 +3049,12 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
   const airborne =
-    !driving && hero.position.y > playerGroundY(hero.position.x, hero.position.z) + 0.06;
-  const speed = driving
+    !driving && !ridingHorse && hero.position.y > playerGroundY(hero.position.x, hero.position.z) + 0.06;
+  const speed = ridingHorse
+    ? keys.has("ShiftLeft")
+      ? 15
+      : 12
+    : driving
     ? tractorEngine
       ? 9
       : 6
@@ -2994,12 +3083,20 @@ function loop() {
   const nearbyPig = marketAnimals.find(
     (animal) => animal.userData.kind === "pig" && animal.position.distanceTo(hero.position) <= 2,
   );
+  const nearbyHorse = marketAnimals.find(
+    (animal) =>
+      animal.userData.kind === "horse" &&
+      !animal.userData.ridden &&
+      animal.position.distanceTo(hero.position) <= 2.1,
+  );
   const nearFridge = refrigerator && hero.position.distanceTo(refrigerator.position) <= 2;
   const nearCouch = Math.hypot(hero.position.x - couchSpot.x, hero.position.z - couchSpot.y) <= 1.45;
   const nearBed = Math.hypot(hero.position.x - bedSpot.x, hero.position.z - bedSpot.y) <= 1.45;
   milkPrompt.hidden =
-    driving || (!nearbyCow && !nearbyGarden && !nearbyPig && !nearFridge && !nearCouch && !nearBed && !resting) || Boolean(milkingCow);
-  if (resting)
+    driving || (!ridingHorse && !nearbyCow && !nearbyGarden && !nearbyPig && !nearbyHorse && !nearFridge && !nearCouch && !nearBed && !resting) || Boolean(milkingCow);
+  if (ridingHorse)
+    milkPrompt.innerHTML = "PRESS <b>E</b> TO DISMOUNT HORSE";
+  else if (resting)
     milkPrompt.innerHTML = resting === "sitting" ? "PRESS <b>E</b> TO STAND" : "PRESS <b>E</b> TO GET UP";
   else if (nearCouch)
     milkPrompt.innerHTML = "PRESS <b>E</b> TO SIT ON COUCH";
@@ -3025,6 +3122,7 @@ function loop() {
           : "PRESS <b>E</b> TO RETURN PAIL"
         : "PRESS <b>E</b> TO CLOSE FRIDGE"
       : "PRESS <b>E</b> TO OPEN FRIDGE";
+  else if (nearbyHorse) milkPrompt.innerHTML = "PRESS <b>E</b> TO RIDE HORSE";
   else if (nearbyCow) milkPrompt.innerHTML = "PRESS <b>E</b> TO MILK COW";
   if (refrigeratorDoor)
     refrigeratorDoor.rotation.y = THREE.MathUtils.lerp(
@@ -3111,7 +3209,25 @@ function loop() {
   }
   hero.position.x = Math.max(-51, Math.min(51, hero.position.x));
   hero.position.z = Math.max(-51, Math.min(51, hero.position.z));
-  if (!resting) {
+  if (ridingHorse) {
+    ridingHorse.position.set(
+      hero.position.x,
+      yWorld(hero.position.x, hero.position.z),
+      hero.position.z,
+    );
+    ridingHorse.rotation.y = hero.rotation.y + Math.PI;
+    hero.position.y = ridingHorse.position.y + 1.47;
+    vy = 0;
+    coat.position.y = 0.72;
+    legs.forEach((leg, index) => {
+      leg.rotation.x = index === 0 ? -1.05 : 1.05;
+      leg.rotation.z = index === 0 ? 0.65 : -0.65;
+    });
+    arms.forEach((arm, index) => {
+      arm.rotation.x = -0.82;
+      arm.rotation.z = index === 0 ? 0.26 : -0.26;
+    });
+  } else if (!resting) {
     vy -= 15 * dt;
     hero.position.y += vy * dt;
     const floor = playerGroundY(hero.position.x, hero.position.z);
