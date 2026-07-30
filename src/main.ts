@@ -703,7 +703,11 @@ function canStandAt(x: number, z: number, radius = 0.32) {
     )
   )
     return false;
+  // Bales remain obstacles for the farmer, but farm vehicles are heavy enough
+  // to drive through them. The loader still picks one up through its existing
+  // proximity check, while the tractor and combine can keep working a row.
   if (
+    !driving &&
     baleObjects.some(
       (bale) => Math.hypot(x - bale.position.x, z - bale.position.z) < radius + 0.48,
     )
