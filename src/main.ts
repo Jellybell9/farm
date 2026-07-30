@@ -24,6 +24,18 @@ document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
   `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><p class="market-section">FARM DEFENSE</p><div class="market-items"><button class="market-item" data-buy="rifle"><span><b>Rifle</b><small>Press Q to protect livestock</small></span><em>300</em></button></div><small class="market-note" id="marketNote">Build your farm or upgrade your equipment.</small>`,
 );
+document.querySelector("#marketplace")!.insertAdjacentHTML(
+  "beforeend",
+  `<button id="sellVegetables">SELL 1 VEGETABLE</button><p class="market-section">MACHINERY & RANCH GEAR</p><div class="market-items"><button class="market-item" data-buy="houseTractor"><span><b>Yard tractor</b><small>Upgraded utility tractor</small></span><em>275</em></button><button class="market-item" data-buy="fieldTractor"><span><b>Field planter</b><small>Heavy-duty seeding rig</small></span><em>350</em></button><button class="market-item" data-buy="barnTractor"><span><b>Bale loader</b><small>Reinforced bale handler</small></span><em>325</em></button></div><p class="market-note">Sell chilled milk, stacked bales, or fridge vegetables. Machinery is delivered to the farmyard.</p>`,
+);
+document.querySelector("#sellMilk")!.insertAdjacentHTML(
+  "beforebegin",
+  `<div>Vegetable price <b>10</b></div>`,
+);
+document.querySelector("#marketplace")!.insertAdjacentHTML(
+  "beforeend",
+  `<p class="market-section">PRODUCTIVITY UPGRADES</p><div class="market-items"><button class="market-item" data-buy="precisionSeeder"><span><b>Precision seed drill</b><small>Plants wider wheat rows</small></span><em>210</em></button><button class="market-item" data-buy="grainBin"><span><b>Grain bin</b><small>Raises bale price to 35</small></span><em>240</em></button><button class="market-item" data-buy="milkChiller"><span><b>Bulk milk cooler</b><small>Raises milk price to 22</small></span><em>190</em></button></div>`,
+);
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
@@ -47,7 +59,7 @@ document.querySelector(".ui")!.insertAdjacentHTML(
   `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Move and interact</b><span>Use Arrow keys to move and drag to look around. Hold Shift to sprint. Press Space to jump; you can steer a little in the air. Press E to interact, enter a vehicle, milk, harvest, plant, or feed animals. Press P to pick up the milk pail. F places a pending vegetable plot, or drops a bale while driving the blue loader.</span></section><section><b>Make and feed bales</b><span>Drive the orange combine through ripe wheat. Drive the green tractor over fallen sheaves; every few sheaves make a bale. Use the blue loader to pick up a bale, then place it in the pasture. Cows, sheep, and horses share pasture bales; pigs do not eat them. Feed three bales daily to protect the cattle.</span></section><section><b>Milk and sell</b><span>Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. Marketplace sells loose bales and chilled milk for coins.</span></section><section><b>Vegetables and pigs</b><span>Buy a vegetable plot, walk to clear ground, face the spot, and press F. At a plot, press E to harvest ripe vegetables; four go straight into the fridge. Press E again on an empty plot to plant it, using one stored vegetable. It ripens next day. Feed every pig one fridge vegetable each day with E or some unfed pigs die.</span></section><section><b>Marketplace upgrades</b><span>Buy animals and vegetable plots under Build Your Farm. Equipment Upgrades improve existing machinery: the wide header cuts more wheat, the power baler uses fewer sheaves, and the tractor engine makes farm vehicles faster.</span></section><section><b>Day, night, and danger</b><span>Day lasts 20 minutes, then night lasts 5 minutes. Watch the DAY/NIGHT timer. Wolves live in the forest and a bear lives in the mountains. At night they hunt pasture livestock, so keep an eye on the herd.</span></section></aside>`,
 );
 document.querySelectorAll<HTMLElement>("#helpPanel section span")[2]!.textContent =
-  "Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. To sell a bale, place it next to another bale anywhere on the farm; chilled milk can be sold directly.";
+  "Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. To sell a bale, place it next to another bale anywhere on the farm; chilled milk and harvested refrigerator vegetables can be sold directly.";
 document.querySelectorAll<HTMLElement>("#helpPanel section span")[5]!.textContent =
   "Day lasts 20 minutes, then night lasts 5 minutes. Wolves live in the forest and a bear lives in the mountains. Keep your distance: if a wild animal reaches you, it attacks until you escape or use your rifle. Too much damage restarts the farm.";
 
@@ -1529,6 +1541,9 @@ let vy = 0,
   wideHeader = false,
   fastBaler = false,
   tractorEngine = false,
+  precisionSeeder = false,
+  grainBin = false,
+  milkChiller = false,
   hasRifle = false,
   selectedFarmer: "avery" | "rowan" | "sage" = "avery",
   gameStarted = false,
@@ -1725,6 +1740,9 @@ const toast = document.querySelector("#toast")!,
   saveButton = document.querySelector<HTMLButtonElement>("#saveButton")!,
   restartButton = document.querySelector<HTMLButtonElement>("#restartButton")!,
   homeButton = document.querySelector<HTMLButtonElement>("#homeButton")!;
+const marketPriceRows = document.querySelectorAll<HTMLElement>("#marketplace > div");
+const balePriceLabel = marketPriceRows[1]!.querySelector("b")!;
+const milkPriceLabel = marketPriceRows[2]!.querySelector("b")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
@@ -1739,13 +1757,21 @@ function refreshFarm() {
   balesLabel.textContent = String(bales);
   fedBalesLabel.textContent = `${fedBales} / 3`;
   coinsLabel.textContent = String(coins);
+  balePriceLabel.textContent = String(grainBin ? 35 : 25);
+  milkPriceLabel.textContent = String(milkChiller ? 22 : 15);
   farmerHealthLabel.textContent = `${Math.ceil(farmerHealth)}%`;
   farmStockLabel.textContent = String(sheep + pigs + vegetablePlots + horses);
   storedLabel.textContent = String(baleObjects.filter(isBaleInSellingStack).length);
   shardLabel.textContent = String(shardCount);
 }
 type FarmMarketItem = "sheep" | "pig" | "vegetables" | "horse";
-type UpgradeMarketItem = "wideHeader" | "fastBaler" | "tractorEngine";
+type UpgradeMarketItem =
+  | "wideHeader"
+  | "fastBaler"
+  | "tractorEngine"
+  | "precisionSeeder"
+  | "grainBin"
+  | "milkChiller";
 type VehicleMarketItem = "houseTractor" | "fieldTractor" | "barnTractor";
 type DefenseMarketItem = "rifle";
 type MarketItem = FarmMarketItem | UpgradeMarketItem | VehicleMarketItem | DefenseMarketItem;
@@ -1757,6 +1783,9 @@ const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   wideHeader: { price: 225, label: "wide combine header" },
   fastBaler: { price: 180, label: "power baler" },
   tractorEngine: { price: 160, label: "tractor engine" },
+  precisionSeeder: { price: 210, label: "precision seed drill" },
+  grainBin: { price: 240, label: "grain bin" },
+  milkChiller: { price: 190, label: "bulk milk cooler" },
   rifle: { price: 300, label: "rifle" },
   houseTractor: { price: 275, label: "yard tractor" },
   fieldTractor: { price: 350, label: "field tractor" },
@@ -2106,6 +2135,9 @@ function buyMarketItem(kind: MarketItem) {
     (kind === "wideHeader" && wideHeader) ||
     (kind === "fastBaler" && fastBaler) ||
     (kind === "tractorEngine" && tractorEngine) ||
+    (kind === "precisionSeeder" && precisionSeeder) ||
+    (kind === "grainBin" && grainBin) ||
+    (kind === "milkChiller" && milkChiller) ||
     (kind === "rifle" && hasRifle) ||
     ((kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor") &&
       deliveredVehicles.has(kind))
@@ -2125,6 +2157,12 @@ function buyMarketItem(kind: MarketItem) {
     fastBaler = true;
   } else if (kind === "tractorEngine") {
     tractorEngine = true;
+  } else if (kind === "precisionSeeder") {
+    precisionSeeder = true;
+  } else if (kind === "grainBin") {
+    grainBin = true;
+  } else if (kind === "milkChiller") {
+    milkChiller = true;
   } else if (kind === "rifle") {
     hasRifle = true;
     rifleModel.visible = true;
@@ -2152,12 +2190,12 @@ function buyMarketItem(kind: MarketItem) {
     addMarketAnimal(kind, sheep + pigs + horses);
   }
   refreshFarm();
-  marketNote.textContent = kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" || kind === "rifle"
+  marketNote.textContent = kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" || kind === "precisionSeeder" || kind === "grainBin" || kind === "milkChiller" || kind === "rifle"
     ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} installed!`
     : kind === "houseTractor" || kind === "fieldTractor" || kind === "barnTractor"
       ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} delivered!`
     : `Welcome home, new ${offer.label}!`;
-  toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" || kind === "rifle" ? "the" : "a"} ${offer.label} for ${offer.price} coins.${kind === "rifle" ? " Press Q to scare off nearby wild animals." : ""}`;
+  toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" || kind === "precisionSeeder" || kind === "grainBin" || kind === "milkChiller" || kind === "rifle" ? "the" : "a"} ${offer.label} for ${offer.price} coins.${kind === "rifle" ? " Press Q to scare off nearby wild animals." : ""}`;
 }
 function refreshDayTimer() {
   const night = dayElapsed >= DAY_LENGTH_SECONDS;
@@ -2250,9 +2288,10 @@ function sellBale() {
   scene.remove(bale);
   if (lastDroppedBale === bale) lastDroppedBale = null;
   bales = Math.max(0, bales - 1);
-  coins += 25;
+  const price = grainBin ? 35 : 25;
+  coins += price;
   refreshFarm();
-  toast.textContent = "Sold one bale at the marketplace for 25 coins.";
+  toast.textContent = `Sold one bale at the marketplace for ${price} coins.`;
 }
 function sellMilk() {
   if (chilledMilk < 1) {
@@ -2260,9 +2299,20 @@ function sellMilk() {
     return;
   }
   chilledMilk--;
-  coins += 15;
+  const price = milkChiller ? 22 : 15;
+  coins += price;
   refreshFarm();
-  toast.textContent = "Sold one chilled pail of milk at the marketplace for 15 coins.";
+  toast.textContent = `Sold one chilled pail of milk at the marketplace for ${price} coins.`;
+}
+function sellVegetables() {
+  if (fridgeVegetables < 1) {
+    toast.textContent = "Store harvested vegetables in the refrigerator before selling them.";
+    return;
+  }
+  fridgeVegetables--;
+  coins += 10;
+  refreshFarm();
+  toast.textContent = "Sold one harvested vegetable at the marketplace for 10 coins.";
 }
 function dropCarriedBale() {
   if (!carriedBale) {
@@ -2419,7 +2469,7 @@ function plantWheatWithTractor() {
     return (
       offset.dot(forward) > -0.3 &&
       offset.dot(forward) < 1.55 &&
-      Math.abs(offset.dot(right)) < 1.35
+      Math.abs(offset.dot(right)) < (precisionSeeder ? 2 : 1.35)
     );
   });
   if (seeds.length === 0) return false;
@@ -2804,6 +2854,7 @@ helpButton.addEventListener("click", () => toggleHelp());
 document.querySelector<HTMLButtonElement>("#helpClose")!.addEventListener("click", () => toggleHelp(false));
 document.querySelector<HTMLButtonElement>("#sellBale")!.addEventListener("click", sellBale);
 document.querySelector<HTMLButtonElement>("#sellMilk")!.addEventListener("click", sellMilk);
+document.querySelector<HTMLButtonElement>("#sellVegetables")!.addEventListener("click", sellVegetables);
 document.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((button) => {
   button.addEventListener("click", () =>
     buyMarketItem(button.dataset.buy as MarketItem),
@@ -2875,7 +2926,7 @@ function saveGame() {
       carryingFridgeVegetable, cattleCare, ripePlots, farmDay, cropMaturity,
       fedBales, coins, dayElapsed, storedBales, sheep, pigs, vegetablePlots, horses,
       cattleCount: cattle.length,
-      wideHeader, fastBaler, tractorEngine, hasRifle, selectedFarmer,
+      wideHeader, fastBaler, tractorEngine, precisionSeeder, grainBin, milkChiller, hasRifle, selectedFarmer,
     },
     animals: marketAnimals.map((animal): SavedAnimal => ({
       kind: animal.userData.kind,
@@ -2972,6 +3023,9 @@ function loadGame() {
       wideHeader = supplies.wideHeader === true;
       fastBaler = supplies.fastBaler === true;
       tractorEngine = supplies.tractorEngine === true;
+      precisionSeeder = supplies.precisionSeeder === true;
+      grainBin = supplies.grainBin === true;
+      milkChiller = supplies.milkChiller === true;
       hasRifle = supplies.hasRifle === true;
       if (
         supplies.selectedFarmer === "avery" ||
