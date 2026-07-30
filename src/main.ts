@@ -1261,6 +1261,47 @@ hero.traverse((o) => {
   if (o instanceof THREE.Mesh) o.castShadow = true;
 });
 scene.add(hero);
+// A small basket of freshly picked vegetables is carried in front of the
+// farmer's hands until it is stored or fed to a pig.
+const vegetableBundle = new THREE.Group();
+const basketMaterial = new THREE.MeshStandardMaterial({
+  color: 0x8b5a2b,
+  roughness: 0.95,
+});
+const carrotMaterial = new THREE.MeshStandardMaterial({
+  color: 0xe8782d,
+  roughness: 0.85,
+});
+const leafMaterial = new THREE.MeshStandardMaterial({
+  color: 0x3f852f,
+  roughness: 0.9,
+});
+const vegetableBasket = new THREE.Mesh(
+  new THREE.BoxGeometry(0.36, 0.16, 0.25),
+  basketMaterial,
+);
+vegetableBasket.position.y = 0.04;
+vegetableBundle.add(vegetableBasket);
+for (const [x, z, tilt] of [
+  [-0.1, -0.04, -0.4],
+  [0.02, -0.07, 0.1],
+  [0.11, 0.03, 0.45],
+] as const) {
+  const carrot = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.21, 7), carrotMaterial);
+  carrot.position.set(x, 0.19, z);
+  carrot.rotation.z = tilt;
+  const leaves = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.14, 5), leafMaterial);
+  leaves.position.set(x, 0.33, z);
+  leaves.rotation.z = tilt;
+  vegetableBundle.add(carrot, leaves);
+}
+vegetableBundle.position.set(0.32, 0.55, -0.42);
+vegetableBundle.rotation.set(0.08, -0.18, 0.04);
+vegetableBundle.visible = false;
+vegetableBundle.traverse((object) => {
+  if (object instanceof THREE.Mesh) object.castShadow = true;
+});
+hero.add(vegetableBundle);
 scene.add(milkBucket);
 const milkStream = new THREE.Mesh(
   new THREE.CylinderGeometry(0.022, 0.022, 0.45, 6),
@@ -1283,6 +1324,7 @@ let vy = 0,
   chilledMilk = 0,
   fridgeVegetables = 0,
   carriedVegetables = 0,
+  carryingFridgeVegetable = false,
   cattleCare = 50,
   ripePlots = 45,
   farmDay = 1,
@@ -1424,6 +1466,7 @@ function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
   vegetablesLabel.textContent = `${carriedVegetables} carried / ${fridgeVegetables} fridge`;
+  vegetableBundle.visible = carriedVegetables > 0;
   const fedPigs = marketAnimals.filter(
     (animal) => animal.userData.kind === "pig" && animal.userData.fedDay === farmDay,
   ).length;
@@ -1695,6 +1738,7 @@ function interactWithVegetablePlot() {
     leaves.forEach((leaf) => (leaf.visible = false));
     plot.userData.stage = "bare";
     carriedVegetables += 4;
+    carryingFridgeVegetable = false;
     refreshFarm();
     toast.textContent = "Harvested 4 vegetables. Take them to the fridge and press E to store them.";
     return true;
@@ -2102,6 +2146,8 @@ function interactWithFridge() {
       ? "The refrigerator is open. Press E again to store your vegetables."
       : milk > 0
       ? "The refrigerator is open. Press E again to put milk inside."
+      : fridgeVegetables > 0
+      ? "The refrigerator is open. Press E again to take a vegetable for a pig."
       : "The refrigerator is open. Bring back fresh milk to chill it.";
     return true;
   }
@@ -2109,6 +2155,7 @@ function interactWithFridge() {
     fridgeVegetables += carriedVegetables;
     toast.textContent = `Stored ${carriedVegetables} vegetables in the refrigerator.`;
     carriedVegetables = 0;
+    carryingFridgeVegetable = false;
     refreshFarm();
     return true;
   }
@@ -2130,6 +2177,14 @@ function interactWithFridge() {
     toast.textContent = pailWasFull
       ? `Chilled the milk and returned the pail to the refrigerator (${chilledMilk} chilled).`
       : "Returned the empty pail to the refrigerator shelf.";
+    return true;
+  }
+  if (fridgeVegetables > 0) {
+    fridgeVegetables--;
+    carriedVegetables = 1;
+    carryingFridgeVegetable = true;
+    refreshFarm();
+    toast.textContent = "Took a vegetable from the refrigerator. Carry it to a pig and press E.";
     return true;
   }
   fridgeOpen = false;
@@ -2163,11 +2218,12 @@ function farmAction() {
         toast.textContent = "This pig has already eaten vegetables today.";
         return;
       }
-      if (fridgeVegetables < 1) {
-        toast.textContent = "Harvest vegetables and store them in the fridge before feeding pigs.";
+      if (!carryingFridgeVegetable || carriedVegetables < 1) {
+        toast.textContent = "Take a vegetable from the open refrigerator, then carry it to this pig.";
         return;
       }
-      fridgeVegetables--;
+      carriedVegetables--;
+      carryingFridgeVegetable = false;
       nearestPig.userData.fedDay = farmDay;
       refreshFarm();
       toast.textContent = "The pig happily eats its daily vegetables.";
@@ -3111,7 +3167,9 @@ function loop() {
   else if (nearbyPig)
     milkPrompt.innerHTML = nearbyPig.userData.fedDay === farmDay
       ? "PIG FED FOR TODAY"
-      : "PRESS <b>E</b> TO FEED PIG VEGETABLES";
+      : carryingFridgeVegetable
+        ? "PRESS <b>E</b> TO FEED PIG VEGETABLE"
+        : "TAKE A VEGETABLE FROM THE FRIDGE";
   else if (nearFridge)
     milkPrompt.innerHTML = fridgeOpen
       ? carriedVegetables > 0
@@ -3120,6 +3178,8 @@ function loop() {
         ? milk > 0
           ? "PRESS <b>E</b> TO CHILL & RETURN PAIL"
           : "PRESS <b>E</b> TO RETURN PAIL"
+        : fridgeVegetables > 0
+          ? "PRESS <b>E</b> TO TAKE VEGETABLE"
         : "PRESS <b>E</b> TO CLOSE FRIDGE"
       : "PRESS <b>E</b> TO OPEN FRIDGE";
   else if (nearbyHorse) milkPrompt.innerHTML = "PRESS <b>E</b> TO RIDE HORSE";
