@@ -1281,6 +1281,51 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.11, kind === "horse" ? 0.65 : 0.43, 0.11), dark);
     leg.position.set(x, (kind === "horse" ? 0.65 : 0.43) / 2, z);
     animal.add(leg);
+    if (kind === "horse") {
+      const hoof = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.16), dark);
+      hoof.position.set(x, 0.05, z + (z > 0 ? 0.025 : -0.025));
+      animal.add(hoof);
+    }
+  }
+  if (kind === "horse") {
+    // Give the horse a recognizable silhouette instead of the generic farm-animal body.
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.64, 10), coat);
+    neck.position.set(0, 1.0, 0.48);
+    neck.rotation.x = -0.48;
+    animal.add(neck);
+
+    for (const x of [-0.14, 0.14]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.25, 8), coat);
+      ear.position.set(x, 1.47, 0.72);
+      ear.rotation.x = -0.12;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), dark);
+      eye.position.set(x * 1.18, 1.27, 0.89);
+      animal.add(ear, eye);
+    }
+
+    const mane = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 1 });
+    for (let segment = 0; segment < 6; segment++) {
+      const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.22, 0.18), mane);
+      tuft.position.set(0, 1.02 - segment * 0.035, 0.49 - segment * 0.18);
+      tuft.rotation.x = -0.28;
+      animal.add(tuft);
+    }
+    const tail = new THREE.Mesh(
+      new THREE.TubeGeometry(
+        new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0.86, -0.72),
+          new THREE.Vector3(0.03, 0.65, -0.98),
+          new THREE.Vector3(-0.1, 0.36, -1.03),
+          new THREE.Vector3(-0.04, 0.2, -0.92),
+        ]),
+        12,
+        0.045,
+        6,
+        false,
+      ),
+      mane,
+    );
+    animal.add(tail);
   }
   if (kind === "sheep") {
     for (const [x, z] of [[-0.24, -0.15], [0.24, -0.15], [-0.24, 0.2], [0.24, 0.2]]) {
