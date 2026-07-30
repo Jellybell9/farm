@@ -1176,7 +1176,8 @@ let vy = 0,
   horses = 0,
   wideHeader = false,
   fastBaler = false,
-  tractorEngine = false;
+  tractorEngine = false,
+  pendingVegetablePlot = false;
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
   hasMilkBucket = false,
@@ -1273,6 +1274,7 @@ const marketOffers: Record<MarketItem, { price: number; label: string }> = {
 const marketNote = document.querySelector("#marketNote")!;
 const marketAnimals: THREE.Group[] = [];
 const deliveredVehicles = new Set<VehicleMarketItem>();
+const vegetablePlotPositions: THREE.Vector2[] = [];
 
 function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   const animal = new THREE.Group();
@@ -1442,7 +1444,7 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   marketAnimals.push(animal);
 }
 
-function addVegetablePlot(number: number) {
+function addVegetablePlot(x: number, z: number) {
   const plot = new THREE.Group();
   const soil = new THREE.MeshStandardMaterial({ color: 0x654126, roughness: 1 });
   const leaf = new THREE.MeshStandardMaterial({ color: 0x4f8f3f, roughness: 0.9 });
@@ -1456,14 +1458,34 @@ function addVegetablePlot(number: number) {
       leaves.position.set(x, 0.42, z);
       plot.add(vegetable, leaves);
     }
-  const slot = number - 1;
-  const x = 27 + (slot % 3) * 2.7;
-  const z = -15 - Math.floor(slot / 3) * 2;
   plot.position.set(x, yWorld(x, z), z);
   plot.traverse((object) => {
     if (object instanceof THREE.Mesh) object.castShadow = true;
   });
   scene.add(plot);
+}
+
+function placeVegetablePlot() {
+  if (!pendingVegetablePlot || driving || resting) return;
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(hero.quaternion);
+  const x = hero.position.x + forward.x * 1.6;
+  const z = hero.position.z + forward.z * 1.6;
+  const clear =
+    Math.abs(x) < 50 &&
+    Math.abs(z) < 50 &&
+    canStandAt(x, z, 1.25) &&
+    vegetablePlotPositions.every((plot) => plot.distanceTo(new THREE.Vector2(x, z)) > 2.1);
+  if (!clear) {
+    toast.textContent = "Choose a clear, open patch of ground for the vegetable plot.";
+    return;
+  }
+  vegetablePlots++;
+  vegetablePlotPositions.push(new THREE.Vector2(x, z));
+  addVegetablePlot(x, z);
+  pendingVegetablePlot = false;
+  refreshFarm();
+  marketNote.textContent = "Vegetable plot planted!";
+  toast.textContent = "Fresh vegetables are now growing in your chosen plot.";
 }
 
 function replaceFarmVehicle(kind: VehicleMarketItem) {
@@ -1489,6 +1511,10 @@ function replaceFarmVehicle(kind: VehicleMarketItem) {
 
 function buyMarketItem(kind: MarketItem) {
   const offer = marketOffers[kind];
+  if (kind === "vegetables" && pendingVegetablePlot) {
+    marketNote.textContent = "Place your current vegetable plot before buying another.";
+    return;
+  }
   if (
     (kind === "wideHeader" && wideHeader) ||
     (kind === "fastBaler" && fastBaler) ||
@@ -1515,8 +1541,11 @@ function buyMarketItem(kind: MarketItem) {
     deliveredVehicles.add(kind);
     replaceFarmVehicle(kind);
   } else if (kind === "vegetables") {
-    vegetablePlots++;
-    addVegetablePlot(vegetablePlots);
+    pendingVegetablePlot = true;
+    refreshFarm();
+    marketNote.textContent = "Face an open spot and press F to place your vegetable plot.";
+    toast.textContent = "Vegetable plot ready. Walk to the desired spot, face it, and press F.";
+    return;
   } else if (kind === "sheep") {
     sheep++;
     addMarketAnimal(kind, sheep + pigs + horses);
@@ -1935,6 +1964,11 @@ addEventListener("keydown", (e) => {
     hero.position.y <= playerGroundY(hero.position.x, hero.position.z) + 0.14
   )
     vy = 6.2;
+  if (e.code === "KeyF" && pendingVegetablePlot && !driving && !resting) {
+    e.preventDefault();
+    placeVegetablePlot();
+    return;
+  }
   if (e.code === "KeyF" && driving && usingLoader) {
     e.preventDefault();
     dropCarriedBale();
