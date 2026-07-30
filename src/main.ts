@@ -1727,8 +1727,19 @@ function feedHerdBale(bale: THREE.Mesh) {
   bales = Math.max(0, bales - 1);
   fedBales++;
   cattleCare = Math.min(100, cattleCare + 12);
+  const sharedFeeders = marketAnimals.filter(
+    (animal) => animal.userData.feedBale === bale && animal.userData.kind !== "pig",
+  );
+  sharedFeeders.forEach((animal) => {
+    animal.userData.feedBale = undefined;
+    animal.userData.state = "grazing";
+    animal.userData.stateTimer = 3 + Math.random() * 5;
+    animal.userData.lastFedDay = farmDay;
+  });
   refreshFarm();
-  toast.textContent = `The cows eat the bale (${fedBales}/3 today).`;
+  toast.textContent = sharedFeeders.length
+    ? `The cows, sheep, and horses share the bale (${fedBales}/3 today).`
+    : `The cows eat the bale (${fedBales}/3 today).`;
   if (fedBales === 3)
     questText.textContent =
       "The herd is fed for today. You can safely end the day.";
@@ -1749,7 +1760,13 @@ function sendCowToEatBale(bale: THREE.Mesh) {
   cow.userData.feedBale = bale;
   cow.userData.eatingTime = 0;
   cow.userData.state = "walking";
-  toast.textContent = "A cow is walking over to eat the bale.";
+  marketAnimals
+    .filter((animal) => animal.userData.kind !== "pig")
+    .forEach((animal) => {
+      animal.userData.feedBale = bale;
+      animal.userData.state = "feeding";
+    });
+  toast.textContent = "The cows, sheep, and horses are heading for the bale.";
   return true;
 }
 function sellBale() {
@@ -2514,8 +2531,8 @@ function updateCattle(dt: number, time: number) {
         part.position.y = THREE.MathUtils.lerp(part.position.y, y - headLowering, dt * 8);
         part.position.z = THREE.MathUtils.lerp(part.position.z, z + 0.12, dt * 8);
       });
-      feedBale.scale.setScalar(Math.max(0.03, 1 - eatingTime / 2));
-      if (eatingTime >= 2) {
+      feedBale.scale.setScalar(Math.max(0.03, 1 - eatingTime / 5));
+      if (eatingTime >= 5) {
         cow.userData.feedBale = undefined;
         cow.userData.state = "grazing";
         cow.userData.stateTimer = 3 + Math.random() * 5;
@@ -2637,6 +2654,40 @@ function updateMarketAnimals(dt: number, time: number) {
     const mane = animal.userData.mane as THREE.Group | undefined;
     const tail = animal.userData.tail as THREE.Group | undefined;
     animal.userData.stateTimer -= dt;
+    const feedBale = animal.userData.feedBale as THREE.Mesh | undefined;
+    if (feedBale) {
+      if (!baleObjects.includes(feedBale)) {
+        animal.userData.feedBale = undefined;
+        animal.userData.state = "grazing";
+      } else {
+        const dx = feedBale.position.x - animal.position.x;
+        const dz = feedBale.position.z - animal.position.z;
+        const distance = Math.hypot(dx, dz);
+        const feedingDistance = animal.userData.kind === "horse" ? 1.45 : 1.15;
+        if (distance > feedingDistance) {
+          const heading = Math.atan2(dx, dz);
+          const turn = THREE.MathUtils.euclideanModulo(
+            heading - animal.rotation.y + Math.PI,
+            Math.PI * 2,
+          ) - Math.PI;
+          animal.rotation.y += turn * Math.min(1, dt * 3);
+          const step = Math.min(distance, 1.3 * dt);
+          const radius = animal.userData.kind === "horse" ? 0.6 : 0.42;
+          if (canAnimalStandAt(animal, animal.position.x + (dx / distance) * step, animal.position.z, radius))
+            animal.position.x += (dx / distance) * step;
+          if (canAnimalStandAt(animal, animal.position.x, animal.position.z + (dz / distance) * step, radius))
+            animal.position.z += (dz / distance) * step;
+          animal.position.y = yWorld(animal.position.x, animal.position.z);
+          animateMarketAnimalLegs(legs, Math.sin(time * 12 + index), 0.5);
+        } else {
+          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0.7, Math.min(1, dt * 5));
+          animateMarketAnimalLegs(legs, 0, 0);
+        }
+        if (tail) tail.rotation.y = Math.sin(time * 3 + index) * 0.12;
+        if (mane) mane.rotation.z = Math.sin(time * 2 + index) * 0.03;
+        return;
+      }
+    }
     if (animal.userData.state === "grazing") {
       head.rotation.x = THREE.MathUtils.lerp(
         head.rotation.x,
