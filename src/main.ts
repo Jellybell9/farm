@@ -1269,54 +1269,59 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   };
   const coat = new THREE.MeshStandardMaterial({ color: colors[kind], roughness: 0.9 });
   const dark = new THREE.MeshStandardMaterial({ color: kind === "pig" ? 0xc77278 : 0x38261e });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(kind === "horse" ? 0.52 : 0.42, 12, 9), coat);
-  body.position.y = 0.65;
-  body.scale.set(kind === "horse" ? 0.9 : 1.1, 0.8, kind === "horse" ? 1.55 : 1.3);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(kind === "horse" ? 0.27 : 0.22, 10, 8), coat);
-  head.position.set(0, kind === "horse" ? 1.2 : 0.84, kind === "horse" ? 0.73 : 0.53);
+  const horse = kind === "horse";
+  const body = new THREE.Mesh(new THREE.SphereGeometry(horse ? 0.55 : 0.42, 12, 9), coat);
+  body.position.y = horse ? 0.98 : 0.65;
+  body.scale.set(horse ? 1.02 : 1.1, horse ? 0.92 : 0.8, horse ? 1.82 : 1.3);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(horse ? 0.3 : 0.22, 10, 8), coat);
+  head.position.set(0, horse ? 1.68 : 0.84, horse ? 1.12 : 0.53);
   const snout = new THREE.Mesh(new THREE.SphereGeometry(kind === "pig" ? 0.13 : 0.08, 8, 6), dark);
-  snout.position.set(0, kind === "horse" ? 1.15 : 0.82, kind === "horse" ? 0.97 : 0.75);
+  snout.position.set(0, horse ? 1.57 : 0.82, horse ? 1.4 : 0.75);
   animal.add(body, head, snout);
-  for (const [x, z] of [[-0.28, -0.38], [0.28, -0.38], [-0.28, 0.38], [0.28, 0.38]]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.11, kind === "horse" ? 0.65 : 0.43, 0.11), dark);
-    leg.position.set(x, (kind === "horse" ? 0.65 : 0.43) / 2, z);
+  for (const [x, z] of horse
+    ? [[-0.36, -0.55], [0.36, -0.55], [-0.36, 0.55], [0.36, 0.55]]
+    : [[-0.28, -0.38], [0.28, -0.38], [-0.28, 0.38], [0.28, 0.38]]) {
+    const legHeight = horse ? 0.92 : 0.43;
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(horse ? 0.13 : 0.11, legHeight, horse ? 0.13 : 0.11), dark);
+    leg.position.set(x, legHeight / 2, z);
     animal.add(leg);
-    if (kind === "horse") {
-      const hoof = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.16), dark);
+    if (horse) {
+      const hoof = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.12, 0.19), dark);
+      hoof.material = new THREE.MeshStandardMaterial({ color: 0x171311, roughness: 1 });
       hoof.position.set(x, 0.05, z + (z > 0 ? 0.025 : -0.025));
       animal.add(hoof);
     }
   }
-  if (kind === "horse") {
+  if (horse) {
     // Give the horse a recognizable silhouette instead of the generic farm-animal body.
     const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.64, 10), coat);
-    neck.position.set(0, 1.0, 0.48);
+    neck.position.set(0, 1.38, 0.77);
     neck.rotation.x = -0.48;
     animal.add(neck);
 
     for (const x of [-0.14, 0.14]) {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.25, 8), coat);
-      ear.position.set(x, 1.47, 0.72);
+      ear.position.set(x, 1.98, 1.07);
       ear.rotation.x = -0.12;
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), dark);
-      eye.position.set(x * 1.18, 1.27, 0.89);
+      eye.position.set(x * 1.55, 1.75, 1.28);
       animal.add(ear, eye);
     }
 
     const mane = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 1 });
     for (let segment = 0; segment < 6; segment++) {
       const tuft = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.22, 0.18), mane);
-      tuft.position.set(0, 1.02 - segment * 0.035, 0.49 - segment * 0.18);
+      tuft.position.set(0, 1.45 - segment * 0.04, 0.7 - segment * 0.22);
       tuft.rotation.x = -0.28;
       animal.add(tuft);
     }
     const tail = new THREE.Mesh(
       new THREE.TubeGeometry(
         new THREE.CatmullRomCurve3([
-          new THREE.Vector3(0, 0.86, -0.72),
-          new THREE.Vector3(0.03, 0.65, -0.98),
-          new THREE.Vector3(-0.1, 0.36, -1.03),
-          new THREE.Vector3(-0.04, 0.2, -0.92),
+          new THREE.Vector3(0, 1.2, -1.02),
+          new THREE.Vector3(0.04, 0.9, -1.34),
+          new THREE.Vector3(-0.12, 0.48, -1.38),
+          new THREE.Vector3(-0.04, 0.28, -1.2),
         ]),
         12,
         0.045,
