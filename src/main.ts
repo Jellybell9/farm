@@ -1440,15 +1440,23 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   for (const [x, z] of horse
     ? [[-0.36, -0.55], [0.36, -0.55], [-0.36, 0.55], [0.36, 0.55]]
     : [[-0.28, -0.38], [0.28, -0.38], [-0.28, 0.38], [0.28, 0.38]]) {
-    const legHeight = horse ? 0.92 : 0.43;
+    const legHeight = horse ? 0.92 : 0.54;
     const leg = new THREE.Group();
     leg.position.set(x, legHeight, z);
     const lowerLeg = new THREE.Mesh(
-      new THREE.BoxGeometry(horse ? 0.13 : 0.11, legHeight, horse ? 0.13 : 0.11),
-      dark,
+      new THREE.BoxGeometry(horse ? 0.13 : 0.14, legHeight, horse ? 0.13 : 0.14),
+      horse ? dark : coat,
     );
     lowerLeg.position.y = -legHeight / 2;
     leg.add(lowerLeg);
+    if (!horse) {
+      const hoof = new THREE.Mesh(
+        new THREE.BoxGeometry(0.17, 0.08, 0.2),
+        dark,
+      );
+      hoof.position.set(0, -legHeight + 0.04, z > 0 ? 0.025 : -0.025);
+      leg.add(hoof);
+    }
     animal.add(leg);
     animalLegs.push(leg);
     if (horse) {
