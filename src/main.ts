@@ -1525,6 +1525,28 @@ let milkingCow: THREE.Group | null = null,
   ridingHorse: THREE.Group | null = null;
 const couchSpot = new THREE.Vector2(10, -6.45);
 const bedSpot = new THREE.Vector2(7.4, -2.95);
+const pastureGate = new THREE.Vector2(11.3, 2.15);
+function sendHorseHome(horse: THREE.Group) {
+  const insidePasture =
+    horse.position.x >= pasture.minX &&
+    horse.position.x <= pasture.maxX &&
+    horse.position.z >= pasture.minZ &&
+    horse.position.z <= pasture.maxZ;
+  if (insidePasture) {
+    chooseMarketAnimalSpot(horse);
+    horse.userData.state = "walking";
+    return;
+  }
+  // The south-fence opening gives a horse a gentle, believable way back into
+  // the pasture instead of snapping it there wherever it was dismounted.
+  horse.userData.returnPath = [
+    pastureGate.clone(),
+    new THREE.Vector2(pastureGate.x, pasture.minZ + 1.35),
+    new THREE.Vector2(15, 9.5),
+  ];
+  horse.userData.target = horse.userData.returnPath[0];
+  horse.userData.state = "returning";
+}
 function mountHorse(horse: THREE.Group) {
   ridingHorse = horse;
   horse.userData.ridden = true;
@@ -1564,6 +1586,8 @@ function dismountHorse() {
     return;
   }
   horse.userData.ridden = false;
+  horse.userData.feedBale = undefined;
+  sendHorseHome(horse);
   ridingHorse = null;
   hero.position.set(exit.x, playerGroundY(exit.x, exit.z), exit.z);
   hero.rotation.y = horse.rotation.y - Math.PI;
@@ -3327,8 +3351,17 @@ function updateCattle(dt: number, time: number) {
     cow.position.y = yWorld(cow.position.x, cow.position.z);
   });
 }
-function canAnimalStandAt(animal: THREE.Group, x: number, z: number, radius: number) {
-  if (x < pasture.minX + radius || x > pasture.maxX - radius || z < pasture.minZ + radius || z > pasture.maxZ - radius)
+function canAnimalStandAt(
+  animal: THREE.Group,
+  x: number,
+  z: number,
+  radius: number,
+  allowOutsidePasture = false,
+) {
+  if (
+    !allowOutsidePasture &&
+    (x < pasture.minX + radius || x > pasture.maxX - radius || z < pasture.minZ + radius || z > pasture.maxZ - radius)
+  )
     return false;
   if (
     solidCircles.some(
@@ -3463,11 +3496,25 @@ function updateMarketAnimals(dt: number, time: number) {
       }
       return;
     }
+    const returningHome = animal.userData.state === "returning";
     const target = animal.userData.target as THREE.Vector2;
     const dx = target.x - animal.position.x;
     const dz = target.y - animal.position.z;
     const distance = Math.hypot(dx, dz);
-    if (distance < 0.15 || animal.userData.stateTimer <= 0) {
+    if (distance < 0.15) {
+      if (returningHome) {
+        const returnPath = animal.userData.returnPath as THREE.Vector2[];
+        returnPath.shift();
+        if (returnPath.length) {
+          animal.userData.target = returnPath[0];
+          return;
+        }
+      }
+      animal.userData.state = "grazing";
+      animal.userData.stateTimer = 2.5 + Math.random() * 5;
+      return;
+    }
+    if (!returningHome && animal.userData.stateTimer <= 0) {
       animal.userData.state = "grazing";
       animal.userData.stateTimer = 2.5 + Math.random() * 5;
       return;
@@ -3478,20 +3525,20 @@ function updateMarketAnimals(dt: number, time: number) {
       Math.PI * 2,
     ) - Math.PI;
     animal.rotation.y += turn * Math.min(1, dt * 3);
-    const step = Math.min(distance, (animal.userData.speed as number) * dt);
+    const step = Math.min(distance, (returningHome ? 0.48 : animal.userData.speed as number) * dt);
     const radius = animal.userData.kind === "horse" ? 0.6 : 0.42;
     let moved = false;
     const stepX = (dx / distance) * step;
     const stepZ = (dz / distance) * step;
-    if (canAnimalStandAt(animal, animal.position.x + stepX, animal.position.z, radius)) {
+    if (canAnimalStandAt(animal, animal.position.x + stepX, animal.position.z, radius, returningHome)) {
       animal.position.x += stepX;
       moved = true;
     }
-    if (canAnimalStandAt(animal, animal.position.x, animal.position.z + stepZ, radius)) {
+    if (canAnimalStandAt(animal, animal.position.x, animal.position.z + stepZ, radius, returningHome)) {
       animal.position.z += stepZ;
       moved = true;
     }
-    if (!moved) {
+    if (!moved && !returningHome) {
       chooseMarketAnimalSpot(animal);
       animal.userData.stateTimer = 4 + Math.random() * 7;
     }
