@@ -5,6 +5,10 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Drive the orange combine through ripe wheat to harvest it.</div></div>`;
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
+  `<section class="home-screen" id="homeScreen"><div class="home-card"><p>WELCOME TO</p><h1>GREENACRE FARM</h1><span>Choose the farmer who will build your homestead.</span><div class="farmer-choices"><button class="farmer-choice selected" data-farmer="avery"><i class="farmer-avatar avery"></i><b>Avery</b><small>Steady hand</small></button><button class="farmer-choice" data-farmer="rowan"><i class="farmer-avatar rowan"></i><b>Rowan</b><small>Field expert</small></button><button class="farmer-choice" data-farmer="sage"><i class="farmer-avatar sage"></i><b>Sage</b><small>Animal friend</small></button></div><button class="start-farm" id="startFarm">START FARM</button><small class="home-note">Your choice can be changed the next time you begin a session.</small></div></section>`,
+);
+document.querySelector(".ui")!.insertAdjacentHTML(
+  "beforeend",
   `<button class="market-toggle" id="marketToggle" style="min-width:176px;min-height:52px;border:2px solid #f4cf68;border-radius:8px;background:linear-gradient(135deg,#b16c28,#754420);color:#fff7d7;font:800 13px Manrope;letter-spacing:1.1px;text-shadow:0 1px 2px #3c2413;box-shadow:0 0 0 3px #173336aa,0 8px 20px #17333688">MARKETPLACE</button><aside class="marketplace" id="marketplace" hidden><button class="market-close" id="marketClose" aria-label="Close marketplace">×</button><p>FARM MARKET</p><h2>Farm Exchange</h2><div>Coins <b id="coins">0</b></div><div>Bale price <b>25</b></div><div>Chilled milk <b>15</b></div><button id="sellBale">SELL 1 BALE</button><button id="sellMilk">SELL 1 MILK</button></aside>`,
 );
 document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
@@ -1407,7 +1411,37 @@ let vy = 0,
   fastBaler = false,
   tractorEngine = false,
   hasRifle = false,
+  selectedFarmer: "avery" | "rowan" | "sage" = "avery",
+  gameStarted = false,
   pendingVegetablePlot = false;
+const homeScreen = document.querySelector<HTMLElement>("#homeScreen")!;
+const startFarmButton = document.querySelector<HTMLButtonElement>("#startFarm")!;
+const farmerChoices = [...document.querySelectorAll<HTMLButtonElement>("[data-farmer]")];
+function applyFarmerStyle(farmer: "avery" | "rowan" | "sage") {
+  selectedFarmer = farmer;
+  const styles = {
+    avery: { shirt: 0x2767b5, jeans: 0x2460ad, hat: 0x6d4228, skin: 0xf0bd91, hair: 0x34251e },
+    rowan: { shirt: 0xa7473c, jeans: 0x344f79, hat: 0x4d2b20, skin: 0xc98b67, hair: 0x2b1b16 },
+    sage: { shirt: 0x4c7d58, jeans: 0x3d6170, hat: 0x775b2d, skin: 0xe0aa7d, hair: 0x3d2921 },
+  } as const;
+  const style = styles[farmer];
+  flannel.color.setHex(style.shirt);
+  denim.color.setHex(style.jeans);
+  leather.color.setHex(style.hat);
+  skin.color.setHex(style.skin);
+  darkHair.color.setHex(style.hair);
+  farmerChoices.forEach((choice) =>
+    choice.classList.toggle("selected", choice.dataset.farmer === farmer),
+  );
+}
+farmerChoices.forEach((choice) =>
+  choice.addEventListener("click", () => applyFarmerStyle(choice.dataset.farmer as "avery" | "rowan" | "sage")),
+);
+startFarmButton.addEventListener("click", () => {
+  gameStarted = true;
+  homeScreen.hidden = true;
+  toast.textContent = `Welcome, ${selectedFarmer[0].toUpperCase()}${selectedFarmer.slice(1)}. Your farm is ready.`;
+});
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
   hasMilkBucket = false,
@@ -2438,6 +2472,7 @@ function shootRifle() {
   toast.textContent = `The ${target.userData.kind} retreats to its home range. It will return later.`;
 }
 addEventListener("keydown", (e) => {
+  if (!gameStarted) return;
   keys.add(e.code);
   if (
     e.code === "Space" &&
@@ -2643,7 +2678,7 @@ function saveGame() {
       carryingFridgeVegetable, cattleCare, ripePlots, farmDay, cropMaturity,
       fedBales, coins, dayElapsed, storedBales, sheep, pigs, vegetablePlots, horses,
       cattleCount: cattle.length,
-      wideHeader, fastBaler, tractorEngine, hasRifle,
+      wideHeader, fastBaler, tractorEngine, hasRifle, selectedFarmer,
     },
     animals: marketAnimals.map((animal): SavedAnimal => ({
       kind: animal.userData.kind,
@@ -2735,6 +2770,12 @@ function loadGame() {
       fastBaler = supplies.fastBaler === true;
       tractorEngine = supplies.tractorEngine === true;
       hasRifle = supplies.hasRifle === true;
+      if (
+        supplies.selectedFarmer === "avery" ||
+        supplies.selectedFarmer === "rowan" ||
+        supplies.selectedFarmer === "sage"
+      )
+        applyFarmerStyle(supplies.selectedFarmer);
       cutter.scale.x = wideHeader ? 1.7 : 1;
       rifleModel.visible = hasRifle;
     }
@@ -3432,6 +3473,11 @@ function updateWildAnimals(dt: number, time: number) {
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
+  if (!gameStarted) {
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+    return;
+  }
   const airborne =
     !driving && !ridingHorse && hero.position.y > playerGroundY(hero.position.x, hero.position.z) + 0.06;
   const speed = ridingHorse
