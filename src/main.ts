@@ -1001,6 +1001,16 @@ function addWildAnimal(kind: "wolf" | "bear", x: number, z: number) {
     roughness: 1,
   });
   const darkFur = new THREE.MeshStandardMaterial({ color: 0x1b1b1a, roughness: 1 });
+  const shagFur = new THREE.MeshStandardMaterial({
+    color: bear ? 0x342018 : 0x3d4643,
+    roughness: 1,
+  });
+  const tooth = new THREE.MeshStandardMaterial({ color: 0xf4ead1, roughness: 0.55 });
+  const fierceEye = new THREE.MeshStandardMaterial({
+    color: 0xe3a74d,
+    emissive: 0x5b2609,
+    roughness: 0.35,
+  });
   const body = new THREE.Mesh(
     new THREE.SphereGeometry(bear ? 0.72 : 0.43, 12, 9),
     fur,
@@ -1008,6 +1018,21 @@ function addWildAnimal(kind: "wolf" | "bear", x: number, z: number) {
   body.position.y = bear ? 0.78 : 0.58;
   body.scale.set(bear ? 1 : 0.9, bear ? 0.95 : 0.82, bear ? 1.35 : 1.65);
   animal.add(body);
+  // Layered tufts break up the smooth silhouette and give each predator a
+  // shaggy coat without losing the game's intentionally low-poly look.
+  const furTufts = new THREE.Group();
+  const tuftPositions = bear
+    ? [[0, 1.42, -0.36], [-0.32, 1.24, -0.18], [0.32, 1.24, -0.18], [0, 1.16, -0.72]]
+    : [[0, 0.94, -0.3], [-0.23, 0.84, -0.05], [0.23, 0.84, -0.05], [0, 0.8, -0.67]];
+  for (const [tuftX, tuftY, tuftZ] of tuftPositions) {
+    const tuft = new THREE.Mesh(
+      new THREE.ConeGeometry(bear ? 0.16 : 0.1, bear ? 0.32 : 0.22, 6),
+      shagFur,
+    );
+    tuft.position.set(tuftX, tuftY, tuftZ);
+    furTufts.add(tuft);
+  }
+  animal.add(furTufts);
   const headPivot = new THREE.Group();
   headPivot.position.set(0, bear ? 1.06 : 0.76, bear ? 0.64 : 0.52);
   const head = new THREE.Mesh(
@@ -1021,16 +1046,48 @@ function addWildAnimal(kind: "wolf" | "bear", x: number, z: number) {
   );
   muzzle.position.set(0, bear ? 0.09 : 0.04, bear ? 0.59 : 0.48);
   headPivot.add(head, muzzle);
+  const mouth = new THREE.Mesh(
+    new THREE.BoxGeometry(bear ? 0.24 : 0.18, 0.055, 0.055),
+    darkFur,
+  );
+  mouth.position.set(0, bear ? 0.01 : -0.035, bear ? 0.62 : 0.51);
+  headPivot.add(mouth);
+  for (const toothX of [-0.08, -0.025, 0.025, 0.08]) {
+    const fang = new THREE.Mesh(
+      new THREE.ConeGeometry(bear ? 0.034 : 0.026, bear ? 0.16 : 0.12, 6),
+      tooth,
+    );
+    fang.position.set(toothX, bear ? -0.055 : -0.08, bear ? 0.635 : 0.525);
+    fang.rotation.x = Math.PI;
+    headPivot.add(fang);
+  }
   for (const side of [-1, 1]) {
     const ear = new THREE.Mesh(
       new THREE.ConeGeometry(bear ? 0.12 : 0.1, bear ? 0.2 : 0.24, 7),
       fur,
     );
     ear.position.set(side * (bear ? 0.21 : 0.16), bear ? 0.5 : 0.4, bear ? 0.2 : 0.15);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 7, 6), darkFur);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(bear ? 0.045 : 0.038, 7, 6), fierceEye);
     eye.position.set(side * (bear ? 0.22 : 0.16), bear ? 0.25 : 0.2, bear ? 0.46 : 0.38);
-    headPivot.add(ear, eye);
+    const brow = new THREE.Mesh(
+      new THREE.ConeGeometry(bear ? 0.1 : 0.07, bear ? 0.2 : 0.14, 5),
+      shagFur,
+    );
+    brow.position.set(side * (bear ? 0.22 : 0.16), bear ? 0.34 : 0.29, bear ? 0.45 : 0.37);
+    brow.rotation.z = side * 0.82;
+    headPivot.add(ear, eye, brow);
   }
+  const cheekRuff = new THREE.Group();
+  for (const side of [-1, 1]) {
+    const ruff = new THREE.Mesh(
+      new THREE.ConeGeometry(bear ? 0.14 : 0.095, bear ? 0.36 : 0.26, 6),
+      shagFur,
+    );
+    ruff.position.set(side * (bear ? 0.32 : 0.23), bear ? 0.1 : 0.06, bear ? 0.25 : 0.2);
+    ruff.rotation.z = side * Math.PI / 2;
+    cheekRuff.add(ruff);
+  }
+  headPivot.add(cheekRuff);
   animal.add(headPivot);
   const legs: THREE.Group[] = [];
   const legHeight = bear ? 0.72 : 0.52;
