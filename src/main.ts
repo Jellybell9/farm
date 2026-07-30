@@ -1290,8 +1290,10 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
     }
   }
   const slot = number - 1;
-  const x = 28 + (slot % 4) * 2.4;
-  const z = 3.5 + Math.floor(slot / 4) * 3;
+  // Keep purchased animals in the visible, fenced pasture. The old spawn area
+  // was beyond the fence, where the procedurally placed trees could hide them.
+  const x = 22.7 - (slot % 3) * 2.1;
+  const z = 9.6 + Math.floor(slot / 3) * 2.1;
   animal.position.set(x, yWorld(x, z), z);
   animal.rotation.y = kind === "horse" ? Math.PI / 2 : (slot % 2) * Math.PI;
   animal.traverse((object) => {
