@@ -752,6 +752,12 @@ function findVehicleExitPosition(vehicle: THREE.Object3D) {
 const baleStack = new THREE.Group();
 baleStack.position.set(3.25, yWorld(3.25, -28.9) + 0.05, -28.9);
 scene.add(baleStack);
+function isBaleOnBarnStack(bale: THREE.Mesh) {
+  return Math.hypot(
+    bale.position.x - baleStack.position.x,
+    bale.position.z - baleStack.position.z,
+  ) < 1.35;
+}
 // The southwest quarter is dedicated to one large working field.
 const soil = new THREE.MeshStandardMaterial({ color: 0x704a2d, roughness: 1 }),
   darkSoil = new THREE.MeshStandardMaterial({ color: 0x4d301f, roughness: 1 }),
@@ -1978,16 +1984,19 @@ function sendCowToEatBale(bale: THREE.Mesh) {
 }
 function sellBale() {
   const bale = baleObjects.find(
-    (candidate) => !cattle.some((cow) => cow.userData.feedBale === candidate),
+    (candidate) =>
+      isBaleOnBarnStack(candidate) &&
+      !cattle.some((cow) => cow.userData.feedBale === candidate),
   );
   if (!bale) {
-    toast.textContent = "No loose bales are available to sell.";
+    toast.textContent = "Stack a bale at the barn before selling it.";
     return;
   }
   baleObjects.splice(baleObjects.indexOf(bale), 1);
   scene.remove(bale);
   if (lastDroppedBale === bale) lastDroppedBale = null;
   bales = Math.max(0, bales - 1);
+  storedBales = Math.max(0, storedBales - 1);
   coins += 25;
   refreshFarm();
   toast.textContent = "Sold one bale at the marketplace for 25 coins.";
@@ -2015,7 +2024,21 @@ function dropCarriedBale() {
     );
   let x = drop.x,
     z = drop.z;
-  if (nearby.length) {
+  if (Math.hypot(drop.x - baleStack.position.x, drop.z - baleStack.position.z) < 2.25) {
+    const stackedBales = baleObjects.filter(isBaleOnBarnStack);
+    const base = stackedBales.length
+      ? Math.max(...stackedBales.map((other) => other.position.y)) + 0.7
+      : yWorld(baleStack.position.x, baleStack.position.z) + 0.35;
+    loader.remove(bale);
+    scene.add(bale);
+    bale.position.set(baleStack.position.x, base, baleStack.position.z);
+    bale.rotation.set(0, 0, Math.PI / 2);
+    baleObjects.push(bale);
+    lastDroppedBale = bale;
+    bales++;
+    storedBales++;
+    toast.textContent = "Bale stacked at the barn and ready to sell.";
+  } else if (nearby.length) {
     const slots = nearby.flatMap((other) => [
       [other.position.x, other.position.z],
       [other.position.x + spacing, other.position.z],
@@ -2042,10 +2065,9 @@ function dropCarriedBale() {
     baleObjects.push(bale);
     lastDroppedBale = bale;
     bales++;
-    storedBales++;
     toast.textContent = column.length
-      ? "Bale stacked neatly on the pile."
-      : "Bale placed neatly beside the stack.";
+      ? "Bale stacked neatly in the field."
+      : "Bale placed neatly in the field.";
   } else {
     loader.remove(bale);
     scene.add(bale);
