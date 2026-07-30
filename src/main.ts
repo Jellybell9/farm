@@ -27,6 +27,10 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
+  `<button class="restart-button" id="restartButton">RESTART GAME</button>`,
+);
+document.querySelector(".ui")!.insertAdjacentHTML(
+  "beforeend",
   `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Move and interact</b><span>Use Arrow keys to move and drag to look around. Hold Shift to sprint. Press Space to jump; you can steer a little in the air. Press E to interact, enter a vehicle, milk, harvest, plant, or feed animals. Press P to pick up the milk pail. F places a pending vegetable plot, or drops a bale while driving the blue loader.</span></section><section><b>Make and feed bales</b><span>Drive the orange combine through ripe wheat. Drive the green tractor over fallen sheaves; every few sheaves make a bale. Use the blue loader to pick up a bale, then place it in the pasture. Cows, sheep, and horses share pasture bales; pigs do not eat them. Feed three bales daily to protect the cattle.</span></section><section><b>Milk and sell</b><span>Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. Marketplace sells loose bales and chilled milk for coins.</span></section><section><b>Vegetables and pigs</b><span>Buy a vegetable plot, walk to clear ground, face the spot, and press F. At a plot, press E to harvest ripe vegetables; four go straight into the fridge. Press E again on an empty plot to plant it, using one stored vegetable. It ripens next day. Feed every pig one fridge vegetable each day with E or some unfed pigs die.</span></section><section><b>Marketplace upgrades</b><span>Buy animals and vegetable plots under Build Your Farm. Equipment Upgrades improve existing machinery: the wide header cuts more wheat, the power baler uses fewer sheaves, and the tractor engine makes farm vehicles faster.</span></section><section><b>Day, night, and danger</b><span>Day lasts 20 minutes, then night lasts 5 minutes. Watch the DAY/NIGHT timer. Wolves live in the forest and a bear lives in the mountains. At night they hunt pasture livestock, so keep an eye on the herd.</span></section></aside>`,
 );
 
@@ -1466,7 +1470,8 @@ const toast = document.querySelector("#toast")!,
   dayTimerLabel = document.querySelector("#dayTimer")!,
   storedLabel = document.querySelector("#stored")!,
   milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!,
-  saveButton = document.querySelector<HTMLButtonElement>("#saveButton")!;
+  saveButton = document.querySelector<HTMLButtonElement>("#saveButton")!,
+  restartButton = document.querySelector<HTMLButtonElement>("#restartButton")!;
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
@@ -2658,7 +2663,27 @@ function loadGame() {
     toast.textContent = "Saved progress could not be restored.";
   }
 }
+let restartArmed = false;
+function restartGame() {
+  if (!restartArmed) {
+    restartArmed = true;
+    restartButton.textContent = "CONFIRM RESTART";
+    toast.textContent = "Press Restart Game again to erase saved progress and start over.";
+    setTimeout(() => {
+      restartArmed = false;
+      restartButton.textContent = "RESTART GAME";
+    }, 4000);
+    return;
+  }
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // A reload still restarts the running session when browser storage is unavailable.
+  }
+  location.reload();
+}
 saveButton.addEventListener("click", saveGame);
+restartButton.addEventListener("click", restartGame);
 loadGame();
 refreshFarm();
 refreshDayTimer();
