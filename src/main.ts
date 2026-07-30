@@ -3,6 +3,7 @@ import * as THREE from "three";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div class="ui"><header><div class="brand"><b>✦</b><div><h1>GREENACRE FARM</h1><small>OPEN COUNTRY EXPLORATION</small></div></div><div class="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div><div class="shards">♧ <strong id="shards">0</strong><small> FARM LEVEL</small></div></header><aside class="quest"><p>FARM JOURNAL</p><h2>A farmer's first day</h2><span id="questText">Make three bales and feed the cattle before ending the day.</span><div><i></i><i></i><i></i></div></aside><aside class="farm-status"><p>FARM SUPPLIES</p><div>Wheat <b id="wheat">0</b></div><div>Cattle care <b id="care">50%</b></div><div>Bales fed today <b id="fedBales">0 / 3</b></div><div>Ripe plots <b id="plots">18</b></div><div>Field bales <b id="bales">0</b></div><div>Barn stack <b id="stored">0</b></div><button id="dropBale">DROP BALE (F)</button><button id="sleep">END DAY</button></aside><div class="location" id="location">HOMESTEAD</div><div class="toast" id="toast">Drive the orange combine through ripe wheat to harvest it.</div></div>`;
+document.querySelector("#stored")!.parentElement!.firstChild!.textContent = "Bales stacked ";
 document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<section class="home-screen" id="homeScreen"><div class="home-card"><p>WELCOME TO</p><h1>GREENACRE FARM</h1><span>Choose the farmer who will build your homestead.</span><div class="farmer-choices"><button class="farmer-choice selected" data-farmer="avery"><i class="farmer-avatar avery"></i><b>Cowboy Wyatt</b><small>Steady hand</small></button><button class="farmer-choice" data-farmer="rowan"><i class="farmer-avatar rowan"></i><b>Cowgirl Daisy</b><small>Field expert</small></button><button class="farmer-choice" data-farmer="sage"><i class="farmer-avatar sage"></i><b>Cowboy Cole</b><small>Animal friend</small></button></div><div class="home-actions"><button class="start-farm" id="startFarm">START NEW FARM</button><button class="continue-farm" id="continueFarm" hidden>CONTINUE SAVED FARM</button></div><small class="home-note">Start New Farm to play with the latest changes, or continue only when you want your saved progress.</small></div></section>`,
@@ -41,6 +42,8 @@ document.querySelector(".ui")!.insertAdjacentHTML(
   "beforeend",
   `<button class="help-button" id="helpButton" aria-expanded="false">? HELP</button><aside class="help-panel" id="helpPanel" hidden><button class="help-close" id="helpClose" aria-label="Close help">×</button><p>HOW TO PLAY</p><h2>Farm Handbook</h2><section><b>Move and interact</b><span>Use Arrow keys to move and drag to look around. Hold Shift to sprint. Press Space to jump; you can steer a little in the air. Press E to interact, enter a vehicle, milk, harvest, plant, or feed animals. Press P to pick up the milk pail. F places a pending vegetable plot, or drops a bale while driving the blue loader.</span></section><section><b>Make and feed bales</b><span>Drive the orange combine through ripe wheat. Drive the green tractor over fallen sheaves; every few sheaves make a bale. Use the blue loader to pick up a bale, then place it in the pasture. Cows, sheep, and horses share pasture bales; pigs do not eat them. Feed three bales daily to protect the cattle.</span></section><section><b>Milk and sell</b><span>Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. Marketplace sells loose bales and chilled milk for coins.</span></section><section><b>Vegetables and pigs</b><span>Buy a vegetable plot, walk to clear ground, face the spot, and press F. At a plot, press E to harvest ripe vegetables; four go straight into the fridge. Press E again on an empty plot to plant it, using one stored vegetable. It ripens next day. Feed every pig one fridge vegetable each day with E or some unfed pigs die.</span></section><section><b>Marketplace upgrades</b><span>Buy animals and vegetable plots under Build Your Farm. Equipment Upgrades improve existing machinery: the wide header cuts more wheat, the power baler uses fewer sheaves, and the tractor engine makes farm vehicles faster.</span></section><section><b>Day, night, and danger</b><span>Day lasts 20 minutes, then night lasts 5 minutes. Watch the DAY/NIGHT timer. Wolves live in the forest and a bear lives in the mountains. At night they hunt pasture livestock, so keep an eye on the herd.</span></section></aside>`,
 );
+document.querySelectorAll<HTMLElement>("#helpPanel section span")[2]!.textContent =
+  "Open the fridge with E, pick up the pail with P, then milk a nearby cow with E. Return the full pail to the open fridge with E to chill it. To sell a bale, place it next to another bale anywhere on the farm; chilled milk can be sold directly.";
 
 const scene = new THREE.Scene();
 const daySky = new THREE.Color(0x87c7db);
@@ -770,6 +773,13 @@ function isBaleOnBarnStack(bale: THREE.Mesh) {
     bale.position.x - baleStack.position.x,
     bale.position.z - baleStack.position.z,
   ) < 1.35;
+}
+function isBaleInSellingStack(bale: THREE.Mesh) {
+  return baleObjects.some(
+    (other) =>
+      other !== bale &&
+      Math.hypot(other.position.x - bale.position.x, other.position.z - bale.position.z) < 0.95,
+  );
 }
 // The southwest quarter is dedicated to one large working field.
 const soil = new THREE.MeshStandardMaterial({ color: 0x704a2d, roughness: 1 }),
@@ -1640,7 +1650,7 @@ function refreshFarm() {
   fedBalesLabel.textContent = `${fedBales} / 3`;
   coinsLabel.textContent = String(coins);
   farmStockLabel.textContent = String(sheep + pigs + vegetablePlots + horses);
-  storedLabel.textContent = String(storedBales);
+  storedLabel.textContent = String(baleObjects.filter(isBaleInSellingStack).length);
   shardLabel.textContent = String(shardCount);
 }
 type FarmMarketItem = "sheep" | "pig" | "vegetables" | "horse";
@@ -2112,18 +2122,17 @@ function sendCowToEatBale(bale: THREE.Mesh) {
 function sellBale() {
   const bale = baleObjects.find(
     (candidate) =>
-      isBaleOnBarnStack(candidate) &&
+      isBaleInSellingStack(candidate) &&
       !cattle.some((cow) => cow.userData.feedBale === candidate),
   );
   if (!bale) {
-    toast.textContent = "Stack a bale at the barn before selling it.";
+    toast.textContent = "Place at least two bales next to each other before selling one.";
     return;
   }
   baleObjects.splice(baleObjects.indexOf(bale), 1);
   scene.remove(bale);
   if (lastDroppedBale === bale) lastDroppedBale = null;
   bales = Math.max(0, bales - 1);
-  storedBales = Math.max(0, storedBales - 1);
   coins += 25;
   refreshFarm();
   toast.textContent = "Sold one bale at the marketplace for 25 coins.";
@@ -2164,7 +2173,7 @@ function dropCarriedBale() {
     lastDroppedBale = bale;
     bales++;
     storedBales++;
-    toast.textContent = "Bale stacked at the barn and ready to sell.";
+    toast.textContent = "Bale stacked at the barn.";
   } else if (nearby.length) {
     const slots = nearby.flatMap((other) => [
       [other.position.x, other.position.z],
