@@ -2118,51 +2118,41 @@ const cutWheatMat = new THREE.MeshStandardMaterial({
   color: 0xe5bd4c,
   roughness: 0.85,
 });
+function addFallenWheat(
+  position: THREE.Vector3,
+  velocity = new THREE.Vector3(),
+  settled = false,
+) {
+  const clump = new THREE.Group();
+  for (let stalk = 0; stalk < 4; stalk++) {
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.028, 0.62, 5),
+      cutWheatMat,
+    );
+    stem.position.set(
+      (Math.random() - 0.5) * 0.18,
+      0.3,
+      (Math.random() - 0.5) * 0.16,
+    );
+    stem.rotation.z = (Math.random() - 0.5) * 0.6;
+    clump.add(stem);
+  }
+  clump.position.copy(position);
+  scene.add(clump);
+  fallenWheat.push({ mesh: clump, velocity, settled });
+}
 function dropCutStalks() {
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
     harvester.quaternion,
   );
-  for (let i = 0; i < 1; i++) {
-    const clump = new THREE.Group();
-    for (let stalk = 0; stalk < 4; stalk++) {
-      const stem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.02, 0.028, 0.62, 5),
-        cutWheatMat,
-      );
-      stem.position.set(
-        (Math.random() - 0.5) * 0.18,
-        0.3,
-        (Math.random() - 0.5) * 0.16,
-      );
-      stem.rotation.z = (Math.random() - 0.5) * 0.6;
-      clump.add(stem);
-    }
-    const spread = new THREE.Vector3(
-      (Math.random() - 0.5) * 0.8,
-      0,
-      (Math.random() - 0.5) * 0.25,
-    );
-    clump.position
-      .copy(harvester.position)
-      .addScaledVector(forward, 1.45)
-      .add(spread);
-    clump.position.y += 0.8 + Math.random() * 0.2;
-    scene.add(clump);
-    fallenWheat.push({
-      mesh: clump,
-      velocity: forward
-        .clone()
-        .multiplyScalar(1 + Math.random())
-        .add(
-          new THREE.Vector3(
-            Math.random() - 0.5,
-            1.2 + Math.random(),
-            Math.random() - 0.5,
-          ),
-        ),
-      settled: false,
-    });
-  }
+  const position = harvester.position
+    .clone()
+    .addScaledVector(forward, 1.45)
+    .add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.8 + Math.random() * 0.2, (Math.random() - 0.5) * 0.25));
+  const velocity = forward.clone().multiplyScalar(1 + Math.random()).add(
+    new THREE.Vector3(Math.random() - 0.5, 1.2 + Math.random(), Math.random() - 0.5),
+  );
+  addFallenWheat(position, velocity);
 }
 function cutRowWithCombine() {
   if (harvester.position.distanceTo(lastCutPosition) < 0.3) return false;
@@ -2668,6 +2658,21 @@ function saveGame() {
       z: garden.position.z,
       stage: garden.userData.stage,
     })),
+    field: {
+      harvested: wheatPlants.flatMap((plant, index) => (plant.visible ? [] : [index])),
+      looseStraw,
+      fallenWheat: fallenWheat.map((drop) => ({
+        x: drop.mesh.position.x,
+        y: drop.mesh.position.y,
+        z: drop.mesh.position.z,
+      })),
+      bales: baleObjects.map((bale) => ({
+        x: bale.position.x,
+        y: bale.position.y,
+        z: bale.position.z,
+        rotation: bale.rotation.z,
+      })),
+    },
     deliveredVehicles: [...deliveredVehicles],
     vehicles: [tractor, harvester, planter, loader].map((vehicle) => ({
       x: vehicle.position.x,
@@ -2692,6 +2697,12 @@ function loadGame() {
       supplies?: Record<string, unknown>;
       animals?: SavedAnimal[];
       gardens?: { x: number; z: number; stage: "ripe" | "bare" | "growing" }[];
+      field?: {
+        harvested?: number[];
+        looseStraw?: number;
+        fallenWheat?: { x: number; y: number; z: number }[];
+        bales?: { x: number; y: number; z: number; rotation: number }[];
+      };
       deliveredVehicles?: VehicleMarketItem[];
       vehicles?: { x: number; y: number; z: number; rotation: number }[];
     };
@@ -2730,6 +2741,29 @@ function loadGame() {
     if (save.hero) {
       hero.position.set(save.hero.x, save.hero.y, save.hero.z);
       hero.rotation.y = save.hero.rotation;
+    }
+    if (save.field) {
+      const harvested = new Set(save.field.harvested ?? []);
+      wheatPlants.forEach((plant, index) => (plant.visible = !harvested.has(index)));
+      looseStraw = typeof save.field.looseStraw === "number" ? save.field.looseStraw : 0;
+      fallenWheat.splice(0).forEach((drop) => scene.remove(drop.mesh));
+      (save.field.fallenWheat ?? []).forEach((drop) =>
+        addFallenWheat(new THREE.Vector3(drop.x, drop.y, drop.z), new THREE.Vector3(), true),
+      );
+      baleObjects.splice(0).forEach((bale) => scene.remove(bale));
+      (save.field.bales ?? []).forEach((savedBale) => {
+        const bale = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.34, 0.34, 0.72, 10),
+          hay,
+        );
+        bale.position.set(savedBale.x, savedBale.y, savedBale.z);
+        bale.rotation.z = savedBale.rotation;
+        bale.castShadow = true;
+        scene.add(bale);
+        baleObjects.push(bale);
+      });
+      bales = baleObjects.length;
+      storedBales = baleObjects.filter(isBaleOnBarnStack).length;
     }
     marketAnimals.splice(0).forEach((animal) => scene.remove(animal));
     (save.animals ?? []).forEach((savedAnimal, index) => {
