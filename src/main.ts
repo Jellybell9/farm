@@ -650,6 +650,33 @@ function canStandAt(x: number, z: number, radius = 0.32) {
   }
   return true;
 }
+
+// Try several positions around a vehicle before placing the farmer outside it.
+// A fixed offset can land inside a wheel, a wall, or another parked vehicle.
+function findVehicleExitPosition(vehicle: THREE.Object3D) {
+  const distances = [1.8, 2.4, 3];
+  const angleOffsets = [
+    Math.PI / 2,
+    -Math.PI / 2,
+    Math.PI,
+    0,
+    (3 * Math.PI) / 4,
+    (-3 * Math.PI) / 4,
+    Math.PI / 4,
+    -Math.PI / 4,
+  ];
+
+  for (const distance of distances) {
+    for (const offset of angleOffsets) {
+      const angle = vehicle.rotation.y + offset;
+      const x = vehicle.position.x + Math.sin(angle) * distance;
+      const z = vehicle.position.z + Math.cos(angle) * distance;
+      if (canStandAt(x, z))
+        return new THREE.Vector3(x, playerGroundY(x, z), z);
+    }
+  }
+  return null;
+}
 const baleStack = new THREE.Group();
 baleStack.position.set(3.25, yWorld(3.25, -28.9) + 0.05, -28.9);
 scene.add(baleStack);
@@ -1648,8 +1675,16 @@ addEventListener("keydown", (e) => {
             : tractor;
       driving = false;
       hero.visible = true;
-      hero.position.copy(vehicle.position).add(new THREE.Vector3(1, 0, 0));
-      toast.textContent = "You climb down from the vehicle.";
+      const exitPosition = findVehicleExitPosition(vehicle);
+      if (exitPosition) {
+        hero.position.copy(exitPosition);
+        toast.textContent = "You climb down from the vehicle.";
+      } else {
+        // Stay in the vehicle instead of leaving the farmer embedded in scenery.
+        driving = true;
+        hero.visible = false;
+        toast.textContent = "No clear space to get out here.";
+      }
     } else if (resting) {
       standUp();
     } else if (Math.hypot(hero.position.x - couchSpot.x, hero.position.z - couchSpot.y) <= 1.45) {
