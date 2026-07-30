@@ -1282,6 +1282,7 @@ let vy = 0,
   milk = 0,
   chilledMilk = 0,
   fridgeVegetables = 0,
+  carriedVegetables = 0,
   cattleCare = 50,
   ripePlots = 45,
   farmDay = 1,
@@ -1377,7 +1378,7 @@ const toast = document.querySelector("#toast")!,
 function refreshFarm() {
   wheatLabel.textContent = String(wheat);
   milkLabel.textContent = `${milk} pail / ${chilledMilk} fridge`;
-  vegetablesLabel.textContent = `${fridgeVegetables} fridge`;
+  vegetablesLabel.textContent = `${carriedVegetables} carried / ${fridgeVegetables} fridge`;
   const fedPigs = marketAnimals.filter(
     (animal) => animal.userData.kind === "pig" && animal.userData.fedDay === farmDay,
   ).length;
@@ -1630,9 +1631,9 @@ function interactWithVegetablePlot() {
     carrots.forEach((carrot) => (carrot.visible = false));
     leaves.forEach((leaf) => (leaf.visible = false));
     plot.userData.stage = "bare";
-    fridgeVegetables += 4;
+    carriedVegetables += 4;
     refreshFarm();
-    toast.textContent = "Harvested vegetables and stored 4 in the refrigerator.";
+    toast.textContent = "Harvested 4 vegetables. Take them to the fridge and press E to store them.";
     return true;
   }
   if (stage === "growing") {
@@ -2034,9 +2035,18 @@ function interactWithFridge() {
   if (!refrigerator || hero.position.distanceTo(refrigerator.position) > 2) return false;
   if (!fridgeOpen) {
     fridgeOpen = true;
-    toast.textContent = milk > 0
+    toast.textContent = carriedVegetables > 0
+      ? "The refrigerator is open. Press E again to store your vegetables."
+      : milk > 0
       ? "The refrigerator is open. Press E again to put milk inside."
       : "The refrigerator is open. Bring back fresh milk to chill it.";
+    return true;
+  }
+  if (carriedVegetables > 0) {
+    fridgeVegetables += carriedVegetables;
+    toast.textContent = `Stored ${carriedVegetables} vegetables in the refrigerator.`;
+    carriedVegetables = 0;
+    refreshFarm();
     return true;
   }
   if (hasMilkBucket) {
@@ -3007,7 +3017,9 @@ function loop() {
       : "PRESS <b>E</b> TO FEED PIG VEGETABLES";
   else if (nearFridge)
     milkPrompt.innerHTML = fridgeOpen
-      ? hasMilkBucket
+      ? carriedVegetables > 0
+        ? "PRESS <b>E</b> TO STORE VEGETABLES"
+        : hasMilkBucket
         ? milk > 0
           ? "PRESS <b>E</b> TO CHILL & RETURN PAIL"
           : "PRESS <b>E</b> TO RETURN PAIL"
