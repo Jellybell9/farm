@@ -13,7 +13,7 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
-  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">FARM FLEET</p><div class="market-items"><button class="market-item" data-buy="houseTractor"><span><b>Yard tractor</b><small>Replaces the green tractor at the house</small></span><em>275</em></button><button class="market-item" data-buy="fieldTractor"><span><b>Field tractor</b><small>Replaces the planter at the wheat field</small></span><em>350</em></button><button class="market-item" data-buy="barnTractor"><span><b>Barn tractor</b><small>Replaces the loader at the barn</small></span><em>325</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><small class="market-note" id="marketNote">Sell farm goods to grow your homestead.</small>`,
+  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">UPGRADED TRACTORS</p><div class="market-items"><button class="market-item" data-buy="houseTractor"><span><b>Yard tractor</b><small>Replaces the green tractor at the house</small></span><em>275</em></button><button class="market-item" data-buy="fieldTractor"><span><b>Field tractor</b><small>Replaces the planter at the wheat field</small></span><em>350</em></button><button class="market-item" data-buy="barnTractor"><span><b>Barn tractor</b><small>Replaces the loader at the barn</small></span><em>325</em></button></div><small class="market-note" id="marketNote">Build your farm or upgrade the working fleet.</small>`,
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
@@ -1344,10 +1344,10 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
       const maneStrand = new THREE.Mesh(
         new THREE.TubeGeometry(
           new THREE.CatmullRomCurve3([
-            new THREE.Vector3(offset, 1.82, 0.95),
-            new THREE.Vector3(offset * 1.45, 1.72, 0.5),
-            new THREE.Vector3(offset * 2.1, 1.52, -0.08),
-            new THREE.Vector3(offset * 2.8, 1.34, -0.5),
+            new THREE.Vector3(offset, 0.48, 0.2),
+            new THREE.Vector3(offset * 1.45, 0.38, -0.25),
+            new THREE.Vector3(offset * 2.1, 0.18, -0.83),
+            new THREE.Vector3(offset * 2.8, 0, -1.25),
           ]),
           14,
           0.028,
@@ -1358,7 +1358,8 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
       );
       maneGroup.add(maneStrand);
     }
-    animal.add(maneGroup);
+    // The mane shares the head pivot so it remains anchored while grazing.
+    headPivot.add(maneGroup);
     const tailGroup = new THREE.Group();
     for (const offset of [-0.1, -0.05, 0, 0.05, 0.1]) {
       const tailStrand = new THREE.Mesh(
