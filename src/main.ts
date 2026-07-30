@@ -1197,6 +1197,30 @@ for (const x of [-0.065, 0.065]) {
   curl.rotation.z = x < 0 ? -0.22 : 0.22;
   mustache.add(curl);
 }
+const cowgirlDress = new THREE.Mesh(
+  new THREE.ConeGeometry(0.41, 0.58, 12),
+  flannel,
+);
+// The dress overlays the shared animated leg rig, so Daisy keeps the same
+// walking, riding, and interaction animations as the other farmers.
+cowgirlDress.position.y = 0.49;
+cowgirlDress.visible = false;
+const braids = new THREE.Group();
+for (const x of [-0.225, 0.225]) {
+  const braid = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.042, 0.3, 4, 7),
+    darkHair,
+  );
+  braid.position.set(x, 1.15, 0.035);
+  braid.rotation.z = x < 0 ? 0.12 : -0.12;
+  const tie = new THREE.Mesh(
+    new THREE.SphereGeometry(0.046, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe6b64f, roughness: 0.65 }),
+  );
+  tie.position.set(x * 1.08, 0.96, 0.035);
+  braids.add(braid, tie);
+}
+braids.visible = false;
 for (const x of [-0.075, 0.075]) {
   const eye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 7, 6), eyeMat);
   eye.position.set(x, 1.34, -0.21);
@@ -1259,6 +1283,7 @@ for (const x of [-0.32, 0.32]) {
   arms.push(armGroup);
   hero.add(armGroup);
 }
+hero.add(cowgirlDress, braids);
 const rifleModel = new THREE.Group();
 const rifleWood = new THREE.MeshStandardMaterial({ color: 0x5d3823, roughness: 0.88 });
 const rifleMetal = new THREE.MeshStandardMaterial({ color: 0x293238, metalness: 0.7, roughness: 0.35 });
@@ -1440,6 +1465,15 @@ function applyFarmerStyle(farmer: "avery" | "rowan" | "sage") {
   leather.color.setHex(style.hat);
   skin.color.setHex(style.skin);
   darkHair.color.setHex(style.hair);
+  const isCowgirl = farmer === "rowan";
+  cowgirlDress.visible = isCowgirl;
+  braids.visible = isCowgirl;
+  beard.visible = !isCowgirl;
+  mustache.visible = !isCowgirl;
+  // Daisy's swept brim and lower crown make the shared western hat read as a
+  // cowgirl hat while the other two farmers retain the standard cowboy shape.
+  hatBrim.scale.set(isCowgirl ? 1.12 : 1, 1, isCowgirl ? 0.92 : 1);
+  hatCrown.scale.set(isCowgirl ? 1.1 : 1, isCowgirl ? 0.84 : 1, 1);
   farmerChoices.forEach((choice) =>
     choice.classList.toggle("selected", choice.dataset.farmer === farmer),
   );
