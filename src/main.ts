@@ -1768,6 +1768,28 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
     headPivot.add(blaze);
 
     const hair = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 1 });
+    const tack = new THREE.MeshStandardMaterial({ color: 0x4b2a1c, roughness: 0.88 });
+    const saddle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.58, 0.16, 0.68),
+      tack,
+    );
+    saddle.position.set(0, 1.48, -0.16);
+    saddle.rotation.x = -0.08;
+    const saddleBlanket = new THREE.Mesh(
+      new THREE.BoxGeometry(0.68, 0.055, 0.82),
+      new THREE.MeshStandardMaterial({ color: 0x9c3731, roughness: 0.9 }),
+    );
+    saddleBlanket.position.set(0, 1.4, -0.16);
+    const girth = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.025, 6, 12), tack);
+    girth.position.set(0, 0.99, -0.14);
+    girth.rotation.x = Math.PI / 2;
+    animal.add(saddleBlanket, saddle, girth);
+    for (const x of [-0.42, 0.42]) {
+      const stirrup = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 6, 10), tack);
+      stirrup.position.set(x, 0.94, -0.22);
+      stirrup.rotation.y = Math.PI / 2;
+      animal.add(stirrup);
+    }
     const maneGroup = new THREE.Group();
     for (const offset of [-0.09, -0.045, 0, 0.045, 0.09]) {
       const maneStrand = new THREE.Mesh(
@@ -1789,15 +1811,18 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
     }
     // The mane shares the head pivot so it remains anchored while grazing.
     headPivot.add(maneGroup);
+    // Anchor the tail at the rump, then build every strand from that anchor.
+    // This keeps the tail visibly connected to the body as it swishes.
     const tailGroup = new THREE.Group();
+    tailGroup.position.set(0, 1.15, -0.9);
     for (const offset of [-0.1, -0.05, 0, 0.05, 0.1]) {
       const tailStrand = new THREE.Mesh(
         new THREE.TubeGeometry(
           new THREE.CatmullRomCurve3([
-            new THREE.Vector3(offset * 0.45, 1.2, -1.02),
-            new THREE.Vector3(offset, 0.92, -1.36),
-            new THREE.Vector3(offset * 1.8, 0.52, -1.48),
-            new THREE.Vector3(offset * 2.4, 0.25, -1.22),
+            new THREE.Vector3(offset * 0.45, 0.08, -0.02),
+            new THREE.Vector3(offset, -0.18, -0.34),
+            new THREE.Vector3(offset * 1.8, -0.55, -0.48),
+            new THREE.Vector3(offset * 2.4, -0.82, -0.22),
           ]),
           14,
           0.035,
@@ -1858,6 +1883,7 @@ function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
   animal.position.set(x, yWorld(x, z), z);
   animal.rotation.y = kind === "horse" ? Math.PI / 2 : (slot % 2) * Math.PI;
   animal.userData.kind = kind;
+  animal.userData.body = body;
   animal.userData.head = headPivot;
   animal.userData.legs = animalLegs;
   animal.userData.target = new THREE.Vector2(x, z);
@@ -3363,6 +3389,16 @@ function animateMarketAnimalLegs(legs: THREE.Group[], stride: number, amount: nu
     leg.rotation.x = stride * diagonal * amount;
   });
 }
+function animateHorseGallop(legs: THREE.Group[], time: number, sprinting: boolean) {
+  const phase = time * (sprinting ? 20 : 15);
+  // The hind legs push in sequence, then the front pair reaches out. This
+  // staggered four-beat motion reads as a gallop instead of a walking trot.
+  const phases = [0, 0.72, Math.PI, Math.PI + 0.72];
+  legs.forEach((leg, index) => {
+    const swing = Math.sin(phase + phases[index]);
+    leg.rotation.x = swing * (index < 2 ? 0.82 : 1.02);
+  });
+}
 function updateMarketAnimals(dt: number, time: number) {
   marketAnimals.forEach((animal, index) => {
     const head = animal.userData.head as THREE.Object3D;
@@ -3370,10 +3406,10 @@ function updateMarketAnimals(dt: number, time: number) {
     const mane = animal.userData.mane as THREE.Group | undefined;
     const tail = animal.userData.tail as THREE.Group | undefined;
     if (animal.userData.ridden) {
-      animateMarketAnimalLegs(legs, 0, 0);
+      animateHorseGallop(legs, time, keys.has("ShiftLeft"));
       head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, 0, Math.min(1, dt * 7));
-      if (tail) tail.rotation.y = Math.sin(time * 3 + index) * 0.08;
-      if (mane) mane.rotation.z = Math.sin(time * 3 + index) * 0.025;
+      if (tail) tail.rotation.y = Math.sin(time * 8 + index) * 0.2;
+      if (mane) mane.rotation.z = Math.sin(time * 8 + index) * 0.065;
       return;
     }
     animal.userData.stateTimer -= dt;
