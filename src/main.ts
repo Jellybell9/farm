@@ -1467,7 +1467,7 @@ function applyFarmerStyle(farmer: "avery" | "rowan" | "sage") {
   selectedFarmer = farmer;
   const styles = {
     avery: { shirt: 0x2767b5, jeans: 0x2460ad, hat: 0x6d4228, skin: 0xf0bd91, hair: 0x34251e },
-    rowan: { shirt: 0xa7473c, jeans: 0x344f79, hat: 0x4d2b20, skin: 0xc98b67, hair: 0x2b1b16 },
+    rowan: { shirt: 0x714aa3, jeans: 0x344f79, hat: 0x4d2b20, skin: 0xc98b67, hair: 0x2b1b16 },
     sage: { shirt: 0x4c7d58, jeans: 0x3d6170, hat: 0x775b2d, skin: 0xe0aa7d, hair: 0x3d2921 },
   } as const;
   const style = styles[farmer];
