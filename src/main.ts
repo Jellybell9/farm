@@ -13,7 +13,7 @@ document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
 );
 document.querySelector("#sellMilk")!.insertAdjacentHTML(
   "afterend",
-  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><small class="market-note" id="marketNote">Sell farm goods to grow your homestead.</small>`,
+  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><p class="market-section">EQUIPMENT UPGRADES</p><div class="market-items"><button class="market-item" data-buy="wideHeader"><span><b>Wide combine header</b><small>Cut a wider swath of wheat</small></span><em>225</em></button><button class="market-item" data-buy="fastBaler"><span><b>Power baler</b><small>Make bales from 2 sheaves</small></span><em>180</em></button><button class="market-item" data-buy="tractorEngine"><span><b>Tractor engine</b><small>Drive farm vehicles faster</small></span><em>160</em></button></div><small class="market-note" id="marketNote">Sell farm goods to grow your homestead.</small>`,
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
@@ -1173,7 +1173,10 @@ let vy = 0,
   sheep = 0,
   pigs = 0,
   vegetablePlots = 0,
-  horses = 0;
+  horses = 0,
+  wideHeader = false,
+  fastBaler = false,
+  tractorEngine = false;
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
   hasMilkBucket = false,
@@ -1251,12 +1254,17 @@ function refreshFarm() {
   storedLabel.textContent = String(storedBales);
   shardLabel.textContent = String(shardCount);
 }
-type MarketItem = "sheep" | "pig" | "vegetables" | "horse";
+type FarmMarketItem = "sheep" | "pig" | "vegetables" | "horse";
+type UpgradeMarketItem = "wideHeader" | "fastBaler" | "tractorEngine";
+type MarketItem = FarmMarketItem | UpgradeMarketItem;
 const marketOffers: Record<MarketItem, { price: number; label: string }> = {
   sheep: { price: 80, label: "sheep" },
   pig: { price: 100, label: "pig" },
   vegetables: { price: 40, label: "vegetable plot" },
   horse: { price: 200, label: "horse" },
+  wideHeader: { price: 225, label: "wide combine header" },
+  fastBaler: { price: 180, label: "power baler" },
+  tractorEngine: { price: 160, label: "tractor engine" },
 };
 const marketNote = document.querySelector("#marketNote")!;
 
@@ -1378,12 +1386,27 @@ function addVegetablePlot(number: number) {
 
 function buyMarketItem(kind: MarketItem) {
   const offer = marketOffers[kind];
+  if (
+    (kind === "wideHeader" && wideHeader) ||
+    (kind === "fastBaler" && fastBaler) ||
+    (kind === "tractorEngine" && tractorEngine)
+  ) {
+    marketNote.textContent = `Your ${offer.label} is already installed.`;
+    return;
+  }
   if (coins < offer.price) {
     marketNote.textContent = `You need ${offer.price - coins} more coins for a ${offer.label}.`;
     return;
   }
   coins -= offer.price;
-  if (kind === "vegetables") {
+  if (kind === "wideHeader") {
+    wideHeader = true;
+    cutter.scale.x = 1.7;
+  } else if (kind === "fastBaler") {
+    fastBaler = true;
+  } else if (kind === "tractorEngine") {
+    tractorEngine = true;
+  } else if (kind === "vegetables") {
     vegetablePlots++;
     addVegetablePlot(vegetablePlots);
   } else if (kind === "sheep") {
@@ -1397,8 +1420,10 @@ function buyMarketItem(kind: MarketItem) {
     addMarketAnimal(kind, sheep + pigs + horses);
   }
   refreshFarm();
-  marketNote.textContent = `Welcome home, new ${offer.label}!`;
-  toast.textContent = `Bought a ${offer.label} for ${offer.price} coins.`;
+  marketNote.textContent = kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine"
+    ? `${offer.label[0].toUpperCase()}${offer.label.slice(1)} installed!`
+    : `Welcome home, new ${offer.label}!`;
+  toast.textContent = `Bought ${kind === "wideHeader" || kind === "fastBaler" || kind === "tractorEngine" ? "the" : "a"} ${offer.label} for ${offer.price} coins.`;
 }
 function refreshDayTimer() {
   const remaining = Math.max(0, Math.ceil(DAY_LENGTH_SECONDS - dayElapsed));
@@ -1593,7 +1618,7 @@ function cutRowWithCombine() {
     return (
       offset.dot(forward) > -0.3 &&
       offset.dot(forward) < 1.65 &&
-      Math.abs(offset.dot(right)) < 1.45
+      Math.abs(offset.dot(right)) < (wideHeader ? 2.45 : 1.45)
     );
   });
   if (cut.length === 0) return false;
@@ -2042,8 +2067,9 @@ function growWheat(now: number) {
           scene.remove(drop.mesh);
           fallenWheat.splice(i, 1);
           looseStraw++;
-          toast.textContent = `Tractor collected wheat (${looseStraw}/3).`;
-          if (looseStraw >= 3) {
+          const sheavesPerBale = fastBaler ? 2 : 3;
+          toast.textContent = `Tractor collected wheat (${looseStraw}/${sheavesPerBale}).`;
+          if (looseStraw >= sheavesPerBale) {
             looseStraw = 0;
             bales++;
             const bale = new THREE.Mesh(
@@ -2246,7 +2272,13 @@ function updateCattle(dt: number, time: number) {
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05),
     t = clock.elapsedTime;
-  const speed = keys.has("ShiftLeft") ? 10 : 5;
+  const speed = driving
+    ? tractorEngine
+      ? 9
+      : 6
+    : keys.has("ShiftLeft")
+      ? 10
+      : 5;
   dayElapsed += dt;
   if (dayElapsed >= DAY_LENGTH_SECONDS) {
     dayElapsed -= DAY_LENGTH_SECONDS;
