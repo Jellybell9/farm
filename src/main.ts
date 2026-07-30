@@ -9,7 +9,11 @@ document.querySelector(".ui")!.insertAdjacentHTML(
 );
 document.querySelector("#wheat")!.parentElement!.insertAdjacentHTML(
   "afterend",
-  `<div>Milk <b id="milk">0</b></div>`,
+  `<div>Milk <b id="milk">0</b></div><div>New farm stock <b id="farmStock">0</b></div>`,
+);
+document.querySelector("#sellMilk")!.insertAdjacentHTML(
+  "afterend",
+  `<p class="market-section">BUILD YOUR FARM</p><div class="market-items"><button class="market-item" data-buy="sheep"><span><b>Sheep</b><small>Grazing companion</small></span><em>80</em></button><button class="market-item" data-buy="pig"><span><b>Pig</b><small>Happy mud lover</small></span><em>100</em></button><button class="market-item" data-buy="vegetables"><span><b>Vegetable plot</b><small>Fresh garden beds</small></span><em>40</em></button><button class="market-item" data-buy="horse"><span><b>Horse</b><small>Strong farm friend</small></span><em>200</em></button></div><small class="market-note" id="marketNote">Sell farm goods to grow your homestead.</small>`,
 );
 document.querySelector("#sleep")!.outerHTML =
   `<div>Day remaining <b id="dayTimer">20:00</b></div>`;
@@ -1165,7 +1169,11 @@ let vy = 0,
   fedBales = 0,
   coins = 0,
   dayElapsed = 0,
-  storedBales = 0;
+  storedBales = 0,
+  sheep = 0,
+  pigs = 0,
+  vegetablePlots = 0,
+  horses = 0;
 let milkingCow: THREE.Group | null = null,
   milkingElapsed = 0,
   hasMilkBucket = false,
@@ -1227,6 +1235,7 @@ const toast = document.querySelector("#toast")!,
   balesLabel = document.querySelector("#bales")!,
   fedBalesLabel = document.querySelector("#fedBales")!,
   coinsLabel = document.querySelector("#coins")!,
+  farmStockLabel = document.querySelector("#farmStock")!,
   dayTimerLabel = document.querySelector("#dayTimer")!,
   storedLabel = document.querySelector("#stored")!,
   milkPrompt = document.querySelector<HTMLElement>("#milkPrompt")!;
@@ -1238,8 +1247,106 @@ function refreshFarm() {
   balesLabel.textContent = String(bales);
   fedBalesLabel.textContent = `${fedBales} / 3`;
   coinsLabel.textContent = String(coins);
+  farmStockLabel.textContent = String(sheep + pigs + vegetablePlots + horses);
   storedLabel.textContent = String(storedBales);
   shardLabel.textContent = String(shardCount);
+}
+type MarketItem = "sheep" | "pig" | "vegetables" | "horse";
+const marketOffers: Record<MarketItem, { price: number; label: string }> = {
+  sheep: { price: 80, label: "sheep" },
+  pig: { price: 100, label: "pig" },
+  vegetables: { price: 40, label: "vegetable plot" },
+  horse: { price: 200, label: "horse" },
+};
+const marketNote = document.querySelector("#marketNote")!;
+
+function addMarketAnimal(kind: "sheep" | "pig" | "horse", number: number) {
+  const animal = new THREE.Group();
+  const colors = {
+    sheep: 0xf3eee0,
+    pig: 0xeaa0a2,
+    horse: 0x7b4c32,
+  };
+  const coat = new THREE.MeshStandardMaterial({ color: colors[kind], roughness: 0.9 });
+  const dark = new THREE.MeshStandardMaterial({ color: kind === "pig" ? 0xc77278 : 0x38261e });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(kind === "horse" ? 0.52 : 0.42, 12, 9), coat);
+  body.position.y = 0.65;
+  body.scale.set(kind === "horse" ? 0.9 : 1.1, 0.8, kind === "horse" ? 1.55 : 1.3);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(kind === "horse" ? 0.27 : 0.22, 10, 8), coat);
+  head.position.set(0, kind === "horse" ? 1.2 : 0.84, kind === "horse" ? 0.73 : 0.53);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(kind === "pig" ? 0.13 : 0.08, 8, 6), dark);
+  snout.position.set(0, kind === "horse" ? 1.15 : 0.82, kind === "horse" ? 0.97 : 0.75);
+  animal.add(body, head, snout);
+  for (const [x, z] of [[-0.28, -0.38], [0.28, -0.38], [-0.28, 0.38], [0.28, 0.38]]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.11, kind === "horse" ? 0.65 : 0.43, 0.11), dark);
+    leg.position.set(x, (kind === "horse" ? 0.65 : 0.43) / 2, z);
+    animal.add(leg);
+  }
+  if (kind === "sheep") {
+    for (const [x, z] of [[-0.24, -0.15], [0.24, -0.15], [-0.24, 0.2], [0.24, 0.2]]) {
+      const wool = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), coat);
+      wool.position.set(x, 0.78, z);
+      animal.add(wool);
+    }
+  }
+  const slot = number - 1;
+  const x = 28 + (slot % 4) * 2.4;
+  const z = 3.5 + Math.floor(slot / 4) * 3;
+  animal.position.set(x, yWorld(x, z), z);
+  animal.rotation.y = kind === "horse" ? Math.PI / 2 : (slot % 2) * Math.PI;
+  animal.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.castShadow = true;
+  });
+  scene.add(animal);
+}
+
+function addVegetablePlot(number: number) {
+  const plot = new THREE.Group();
+  const soil = new THREE.MeshStandardMaterial({ color: 0x654126, roughness: 1 });
+  const leaf = new THREE.MeshStandardMaterial({ color: 0x4f8f3f, roughness: 0.9 });
+  const carrot = new THREE.MeshStandardMaterial({ color: 0xe18132, roughness: 0.85 });
+  plot.add(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.16, 1.5), soil));
+  for (const x of [-0.65, -0.22, 0.22, 0.65])
+    for (const z of [-0.35, 0.35]) {
+      const vegetable = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 6), carrot);
+      vegetable.position.set(x, 0.2, z);
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.34, 5), leaf);
+      leaves.position.set(x, 0.42, z);
+      plot.add(vegetable, leaves);
+    }
+  const slot = number - 1;
+  const x = 27 + (slot % 3) * 2.7;
+  const z = -15 - Math.floor(slot / 3) * 2;
+  plot.position.set(x, yWorld(x, z), z);
+  plot.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.castShadow = true;
+  });
+  scene.add(plot);
+}
+
+function buyMarketItem(kind: MarketItem) {
+  const offer = marketOffers[kind];
+  if (coins < offer.price) {
+    marketNote.textContent = `You need ${offer.price - coins} more coins for a ${offer.label}.`;
+    return;
+  }
+  coins -= offer.price;
+  if (kind === "vegetables") {
+    vegetablePlots++;
+    addVegetablePlot(vegetablePlots);
+  } else if (kind === "sheep") {
+    sheep++;
+    addMarketAnimal(kind, sheep + pigs + horses);
+  } else if (kind === "pig") {
+    pigs++;
+    addMarketAnimal(kind, sheep + pigs + horses);
+  } else {
+    horses++;
+    addMarketAnimal(kind, sheep + pigs + horses);
+  }
+  refreshFarm();
+  marketNote.textContent = `Welcome home, new ${offer.label}!`;
+  toast.textContent = `Bought a ${offer.label} for ${offer.price} coins.`;
 }
 function refreshDayTimer() {
   const remaining = Math.max(0, Math.ceil(DAY_LENGTH_SECONDS - dayElapsed));
@@ -1747,6 +1854,11 @@ helpButton.addEventListener("click", () => toggleHelp());
 document.querySelector<HTMLButtonElement>("#helpClose")!.addEventListener("click", () => toggleHelp(false));
 document.querySelector<HTMLButtonElement>("#sellBale")!.addEventListener("click", sellBale);
 document.querySelector<HTMLButtonElement>("#sellMilk")!.addEventListener("click", sellMilk);
+document.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((button) => {
+  button.addEventListener("click", () =>
+    buyMarketItem(button.dataset.buy as MarketItem),
+  );
+});
 function endDay() {
   let dayReport = "";
   if (cattle.length > 0 && fedBales < 3) {
